@@ -245,7 +245,7 @@ VITE_GLPI_AUTH_BASIC=seu_token_basic_aqui
 VITE_GLPI_APP_TOKEN=seu_app_token_aqui
 
 # ID do grupo técnico (ex: 108 = RPA)
-VITE_GLPI_ENTITY_ID=108
+VITE_GLPI_ENTITY_ID=seu_id_aqui
 ```
 
 | Variável | Descrição |
