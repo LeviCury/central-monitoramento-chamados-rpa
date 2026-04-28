@@ -1,10 +1,12 @@
 import { Ticket } from '../types';
-import { ExternalLink, FileText, Search } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Eye, FileText, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { formatHoursMinutes } from '../utils/timeFormat';
 
 interface TicketTableProps {
   tickets: Ticket[];
+  onSelectTicket: (ticket: Ticket) => void;
 }
 
 const GLPI_BASE_URL = 'https://central.minervafoods.com/front/ticket.form.php?id=';
@@ -29,7 +31,7 @@ const STATUS_STYLES_DARK: Record<string, string> = {
   'Pendente': 'bg-red-500/20 text-red-300 border-red-500/30',
 };
 
-export default function TicketTable({ tickets }: TicketTableProps) {
+export default function TicketTable({ tickets, onSelectTicket }: TicketTableProps) {
   const { isDark } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -76,6 +78,14 @@ export default function TicketTable({ tickets }: TicketTableProps) {
     return name;
   };
 
+  const getHoursWarning = (ticket: Ticket) => {
+    if (ticket.hours_status === 'missing_planned') return 'Falta planejado';
+    if (ticket.hours_status === 'missing_realized') return 'Falta realizado';
+    if (ticket.hours_status === 'missing_both') return 'Faltam apontamentos';
+    if (ticket.hours_status === 'legacy') return 'Legado';
+    return null;
+  };
+
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva overflow-hidden">
       {/* Header */}
@@ -117,6 +127,9 @@ export default function TicketTable({ tickets }: TicketTableProps) {
               <th className="text-left py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Título</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Status</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Técnico</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Planejado</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Realizado</th>
+              <th className="text-center py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Legado</th>
               <th className="text-left py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Data Abertura</th>
               <th className="text-center py-4 px-6 text-xs font-semibold text-minerva-navy dark:text-white uppercase tracking-wider">Ações</th>
             </tr>
@@ -124,18 +137,21 @@ export default function TicketTable({ tickets }: TicketTableProps) {
           <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
             {displayedTickets.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-gray-400 dark:text-gray-500">
+                <td colSpan={9} className="py-12 text-center text-gray-400 dark:text-gray-500">
                   <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" />
                   <p>Nenhum chamado encontrado</p>
                 </td>
               </tr>
             ) : (
-              displayedTickets.map((ticket, index) => (
-                <tr 
-                  key={ticket.id} 
-                  className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                  style={{ animationDelay: `${index * 0.03}s` }}
-                >
+              displayedTickets.map((ticket, index) => {
+                const hoursWarning = getHoursWarning(ticket);
+
+                return (
+                  <tr 
+                    key={ticket.id} 
+                    className="hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                    style={{ animationDelay: `${index * 0.03}s` }}
+                  >
                   <td className="py-4 px-6">
                     <span className="font-mono text-sm text-minerva-navy dark:text-white font-medium">
                       #{ticket.id}
@@ -156,10 +172,31 @@ export default function TicketTable({ tickets }: TicketTableProps) {
                     <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full border ${getStatusBadgeStyle(ticket.status)}`}>
                       {ticket.status}
                     </span>
+                    {hoursWarning && (
+                      <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 dark:text-amber-300">
+                        <AlertTriangle className="w-3 h-3" />
+                        {hoursWarning}
+                      </div>
+                    )}
                   </td>
                   <td className="py-4 px-6">
                     <span className="text-sm text-gray-600 dark:text-gray-300">
                       {formatTechnicianName(ticket.assigned_technician)}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-sm font-semibold text-minerva-navy dark:text-white">
+                      {formatHoursMinutes(ticket.planned_time_hours)}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-300">
+                      {formatHoursMinutes(ticket.realized_time_hours)}
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-300">
+                      {formatHoursMinutes(ticket.legacy_time_hours)}
                     </span>
                   </td>
                   <td className="py-4 px-6">
@@ -167,18 +204,29 @@ export default function TicketTable({ tickets }: TicketTableProps) {
                       {formatDate(ticket.created_at)}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-center">
+                  <td className="py-4 px-6">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => onSelectTicket(ticket)}
+                        className="inline-flex items-center justify-center w-9 h-9 bg-minerva-navy/5 dark:bg-white/10 hover:bg-minerva-navy hover:text-white text-minerva-navy dark:text-white rounded-xl transition-all"
+                        title="Ver detalhes"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
                     <a
                       href={`${GLPI_BASE_URL}${ticket.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center justify-center w-9 h-9 bg-minerva-navy/5 dark:bg-white/10 hover:bg-minerva-red hover:text-white text-minerva-navy dark:text-white rounded-xl transition-all"
+                      title="Abrir no GLPI"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </a>
+                    </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

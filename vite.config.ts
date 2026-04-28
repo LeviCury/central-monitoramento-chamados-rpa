@@ -14,7 +14,7 @@ export default defineConfig({
         target: 'https://central.minervafoods.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/glpi/, '/apirest.php'),
-        secure: true,
+        secure: false,
       },
     },
   },

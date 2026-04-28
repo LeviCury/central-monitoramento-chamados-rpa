@@ -48,8 +48,8 @@ export default function RevenueChart({ data }: RevenueChartProps) {
               border: '1px solid #e5e7eb',
               borderRadius: '6px',
             }}
-            formatter={(value: number) => [
-              `R$ ${value.toLocaleString('pt-BR', {
+            formatter={(value: number | string | undefined) => [
+              `R$ ${Number(value || 0).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
               })}`,
             ]}

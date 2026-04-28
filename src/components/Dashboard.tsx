@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Ticket, FilterState } from '../types';
-import { RefreshCw, AlertCircle, TrendingUp, Clock, CheckCircle, Users, Moon, Sun, Minimize2, Monitor, Download } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Clock, CheckCircle, Users, Moon, Sun, Minimize2, Monitor, Download, TrendingDown } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import TicketFilterPanel from './TicketFilterPanel';
 import StatusChart from './StatusChart';
 import TechnicianChart from './TechnicianChart';
 import TimelineChart from './TimelineChart';
 import TicketTable from './TicketTable';
+import PlannedVsRealizedChart from './PlannedVsRealizedChart';
+import TicketDetailPanel from './TicketDetailPanel';
+import { formatHoursMinutes } from '../utils/timeFormat';
 import {
   fetchTickets,
   fetchWorkHoursForTickets,
@@ -14,6 +17,7 @@ import {
   aggregateTicketsByStatus,
   aggregateTicketsByTechnician,
   aggregateTicketsByDate,
+  aggregatePlannedVsRealizedByCollaborator,
   getUniqueTechnicians,
   getUniqueStatuses,
 } from '../services/analytics';
@@ -27,7 +31,7 @@ const MINERVA_LOGO_LIGHT = 'https://wiki.minervafoods.com/xwiki/bin/download/Fla
 const AUTO_REFRESH_INTERVAL = 20;
 
 export default function Dashboard() {
-  const { theme, toggleTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingHours, setLoadingHours] = useState(false);
@@ -37,6 +41,7 @@ export default function Dashboard() {
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [timeAgo, setTimeAgo] = useState<string>('agora');
   const [exporting, setExporting] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   const [filters, setFilters] = useState<FilterState>({
@@ -77,7 +82,7 @@ export default function Dashboard() {
         });
       }
 
-      if (hasDateFilter && ticketsData.length > 0 && ticketsData.length <= 100) {
+      if (ticketsData.length > 0 && ticketsData.length <= 200) {
         setLoadingHours(true);
         try {
           await fetchWorkHoursForTickets(ticketsData);
@@ -183,7 +188,7 @@ export default function Dashboard() {
         if (dashboardRef.current?.requestFullscreen) {
           await dashboardRef.current.requestFullscreen();
         }
-      } catch (err) {
+      } catch {
         console.log('Fullscreen não suportado, usando modo simulado');
       }
       setPresentationMode(true);
@@ -193,7 +198,7 @@ export default function Dashboard() {
         if (document.fullscreenElement) {
           await document.exitFullscreen();
         }
-      } catch (err) {
+      } catch {
         console.log('Erro ao sair do fullscreen');
       }
       setPresentationMode(false);
@@ -249,6 +254,7 @@ export default function Dashboard() {
   const statusData = aggregateTicketsByStatus(tickets);
   const technicianData = aggregateTicketsByTechnician(tickets);
   const timelineData = aggregateTicketsByDate(tickets);
+  const plannedVsRealizedData = aggregatePlannedVsRealizedByCollaborator(tickets);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -259,6 +265,14 @@ export default function Dashboard() {
   const periodLabel = hasDateFilter
     ? `${formatDate(filters.dateRange.start)} — ${formatDate(filters.dateRange.end)}`
     : 'Visualizando todos os períodos';
+  const balanceIsLoss = metrics.hoursBalanceType === 'loss';
+  const balanceIsNeutral = metrics.hoursBalanceType === 'neutral';
+  const balanceTitle = balanceIsNeutral ? 'Saldo de Horas' : balanceIsLoss ? 'Perda de Horas' : 'Ganho de Horas';
+  const balanceSubtitle = balanceIsNeutral
+    ? 'Realizado igual ao planejado'
+    : balanceIsLoss
+      ? 'Horas acima do planejado'
+      : 'Horas economizadas';
 
   return (
     <div 
@@ -364,7 +378,7 @@ export default function Dashboard() {
         )}
 
         {/* KPIs Premium */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 ${hasDateFilter ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 ${presentationMode ? 'mb-6' : 'mb-8'}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 ${presentationMode ? 'mb-6' : 'mb-8'}`}>
           <KPICard
             title="Total de Chamados"
             value={metrics.total}
@@ -393,18 +407,35 @@ export default function Dashboard() {
             large={presentationMode}
           />
           
-          {hasDateFilter && (
-            <KPICard
-              title="Média de Horas"
-              value={loadingHours ? '...' : `${metrics.avgWorkHours}h`}
-              subtitle={loadingHours ? 'Calculando...' : `${metrics.totalWorkHours}h trabalhadas`}
-              icon={<Clock className={presentationMode ? "w-8 h-8" : "w-6 h-6"} />}
-              color="red"
-              delay={3}
-              large={presentationMode}
-            />
-          )}
+          <KPICard
+            title="Média de Horas"
+            value={loadingHours ? '...' : formatHoursMinutes(metrics.avgWorkHours)}
+            subtitle={loadingHours ? 'Calculando...' : `${formatHoursMinutes(metrics.totalRealizedHours)} realizadas`}
+            icon={<Clock className={presentationMode ? "w-8 h-8" : "w-6 h-6"} />}
+            color="red"
+            delay={3}
+            large={presentationMode}
+          />
+
+          <KPICard
+            title={balanceTitle}
+            value={loadingHours ? '...' : formatHoursMinutes(Math.abs(metrics.hoursBalance))}
+            subtitle={loadingHours ? 'Calculando...' : balanceSubtitle}
+            icon={balanceIsLoss ? <TrendingDown className={presentationMode ? "w-8 h-8" : "w-6 h-6"} /> : <TrendingUp className={presentationMode ? "w-8 h-8" : "w-6 h-6"} />}
+            color={balanceIsLoss ? 'red' : balanceIsNeutral ? 'navy' : 'green'}
+            delay={4}
+            large={presentationMode}
+          />
         </div>
+
+        {metrics.pendingHoursNotes > 0 && !presentationMode && (
+          <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-500/30 rounded-2xl flex items-center gap-3 animate-fade-in">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+            <p className="text-sm text-amber-700 dark:text-amber-200">
+              {metrics.pendingHoursNotes} chamado(s) atual(is) com apontamento planejado ou realizado pendente.
+            </p>
+          </div>
+        )}
 
         {/* Content Grid - Modo Normal */}
         {!presentationMode && (
@@ -426,6 +457,10 @@ export default function Dashboard() {
                 <TimelineChart data={timelineData} />
               </div>
 
+              <div className="animate-fade-in" style={{ animationDelay: '0.15s' }}>
+                <PlannedVsRealizedChart data={plannedVsRealizedData} />
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
                   <StatusChart data={statusData} />
@@ -445,6 +480,10 @@ export default function Dashboard() {
               <TimelineChart data={timelineData} />
             </div>
 
+            <div className="animate-fade-in">
+              <PlannedVsRealizedChart data={plannedVsRealizedData} />
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="animate-fade-in">
                 <StatusChart data={statusData} />
@@ -459,7 +498,7 @@ export default function Dashboard() {
         {/* Tabela de Chamados - Apenas no modo normal */}
         {!presentationMode && (
           <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
-            <TicketTable tickets={tickets} />
+            <TicketTable tickets={tickets} onSelectTicket={setSelectedTicket} />
           </div>
         )}
 
@@ -542,6 +581,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      <TicketDetailPanel ticket={selectedTicket} onClose={() => setSelectedTicket(null)} />
     </div>
   );
 }

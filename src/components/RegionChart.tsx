@@ -19,9 +19,11 @@ export default function RegionChart({ data }: RegionChartProps) {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ region, percent }) =>
-              `${region} ${(percent * 100).toFixed(0)}%`
-            }
+            label={(props) => {
+              const payload = props.payload as { region?: string } | undefined;
+              const percent = typeof props.percent === 'number' ? props.percent : 0;
+              return `${payload?.region ?? ''} ${(percent * 100).toFixed(0)}%`;
+            }}
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
@@ -34,8 +36,8 @@ export default function RegionChart({ data }: RegionChartProps) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(value: number) => [
-              `R$ ${value.toLocaleString('pt-BR', {
+            formatter={(value: number | string | undefined) => [
+              `R$ ${Number(value || 0).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
               })}`,
             ]}

@@ -6,7 +6,7 @@
  * 2. Buscar tickets: POST /search/Ticket com Session-Token + App-Token
  */
 
-import { Ticket } from '../types';
+import { Ticket, TicketTaskEntry, TicketTaskKind } from '../types';
 
 // Configuração da API
 // Em desenvolvimento, usa proxy do Vite para contornar CORS
@@ -18,6 +18,7 @@ const GLPI_BASE_URL = isDev
 
 const GLPI_AUTH_BASIC = import.meta.env.VITE_GLPI_AUTH_BASIC as string;
 const GLPI_APP_TOKEN = import.meta.env.VITE_GLPI_APP_TOKEN as string;
+const GLPI_ENTITY_ID = import.meta.env.VITE_GLPI_ENTITY_ID as string | undefined;
 
 // Validação das variáveis de ambiente
 if (!GLPI_AUTH_BASIC || !GLPI_APP_TOKEN) {
@@ -31,179 +32,92 @@ let sessionExpiry: number = 0;
 // Cache de usuários (ID -> Nome completo)
 const userCache: Map<string, string> = new Map();
 
-// Cache de horas trabalhadas por ticket (ticketId -> horas)
-const ticketHoursCache: Map<string, number> = new Map();
+// Cache de apontamentos por ticket (ticketId -> tarefas RPA filtradas)
+const ticketTaskCache: Map<string, TicketTaskEntry[]> = new Map();
 
 // Constantes de tempo
 const SESSION_DURATION_MS = 30 * 60 * 1000; // 30 minutos
+const PLANNED_TASK_CATEGORY_ID = 15;
+const REALIZED_TASK_CATEGORY_ID = 16;
+
+const ALLOWED_COLLABORATOR_ALIASES: Record<string, string> = {
+  'Levi Ribeiro Cury': 'Levi Ribeiro Cury',
+  'Igor Martins Mununcio': 'Igor Martins Mununcio',
+  'Igor Martins Minuncio': 'Igor Martins Mununcio',
+  'Guilherme Bretanha Franco Fernandes': 'Guilherme Bretanha Franco Fernandes',
+  'Daniel Eduardo Fernandes dos Santos': 'Daniel Eduardo Fernandes dos Santos',
+};
 
 /**
- * Feriados nacionais brasileiros (adicione mais conforme necessário)
- * Formato: 'MM-DD' para feriados fixos, 'YYYY-MM-DD' para feriados móveis
+ * Normaliza nomes para comparar os usuários do GLPI sem depender de acentos,
+ * maiúsculas/minúsculas ou espaços duplicados.
  */
-const FERIADOS_FIXOS = [
-  '01-01', // Confraternização Universal
-  '04-21', // Tiradentes
-  '05-01', // Dia do Trabalho
-  '09-07', // Independência
-  '10-12', // Nossa Senhora Aparecida
-  '11-02', // Finados
-  '11-15', // Proclamação da República
-  '12-25', // Natal
-];
+function normalizeName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-// Feriados móveis de 2024, 2025, 2026 (Carnaval, Sexta-feira Santa, Corpus Christi)
-const FERIADOS_MOVEIS = [
-  // 2024
-  '2024-02-12', '2024-02-13', // Carnaval
-  '2024-03-29', // Sexta-feira Santa
-  '2024-05-30', // Corpus Christi
-  // 2025
-  '2025-03-03', '2025-03-04', // Carnaval
-  '2025-04-18', // Sexta-feira Santa
-  '2025-06-19', // Corpus Christi
-  // 2026
-  '2026-02-16', '2026-02-17', // Carnaval
-  '2026-04-03', // Sexta-feira Santa
-  '2026-06-04', // Corpus Christi
-];
+const ALLOWED_COLLABORATOR_MAP = new Map(
+  Object.entries(ALLOWED_COLLABORATOR_ALIASES).map(([alias, canonical]) => [
+    normalizeName(alias),
+    canonical,
+  ])
+);
 
-/**
- * Verifica se uma data é feriado
- */
-function isFeriado(date: Date): boolean {
-  const mmdd = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  const yyyymmdd = `${date.getFullYear()}-${mmdd}`;
-  
-  return FERIADOS_FIXOS.includes(mmdd) || FERIADOS_MOVEIS.includes(yyyymmdd);
+function getAllowedCollaboratorName(name: string): string | null {
+  return ALLOWED_COLLABORATOR_MAP.get(normalizeName(name)) ?? null;
+}
+
+function toNumber(value: unknown): number | null {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function getTaskKind(categoryId: number | null): TicketTaskKind {
+  if (categoryId === PLANNED_TASK_CATEGORY_ID) return 'planned';
+  if (categoryId === REALIZED_TASK_CATEGORY_ID) return 'realized';
+  return 'legacy';
+}
+
+function getTaskUserId(task: Record<string, unknown>): string {
+  const userId = task.users_id ?? task.users_id_tech ?? task.users_id_editor ?? task.user_id;
+  return userId == null ? '' : String(userId);
+}
+
+async function resolveTaskCollaborator(task: Record<string, unknown>): Promise<string | null> {
+  const taskUser = getTaskUserId(task);
+  if (!taskUser) return null;
+
+  const directMatch = getAllowedCollaboratorName(taskUser);
+  if (directMatch) return directMatch;
+
+  if (/^\d+$/.test(taskUser)) {
+    const resolvedUser = await fetchUserName(taskUser);
+    return getAllowedCollaboratorName(resolvedUser);
+  }
+
+  return null;
 }
 
 /**
- * Verifica se uma data é dia útil (não é fim de semana nem feriado)
- */
-function isDiaUtil(date: Date): boolean {
-  const dayOfWeek = date.getDay(); // 0 = Domingo, 6 = Sábado
-  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
-  if (isFeriado(date)) return false;
-  return true;
-}
-
-/**
- * Retorna as horas de trabalho para um dia da semana
- * Seg-Qui: 9h (08:00-12:00 + 13:00-18:00)
- * Sexta: 8h (08:00-12:00 + 13:00-17:00)
- */
-function getHorasTrabalho(dayOfWeek: number): { inicio1: number; fim1: number; inicio2: number; fim2: number; totalHoras: number } {
-  if (dayOfWeek === 5) { // Sexta-feira
-    return { inicio1: 8, fim1: 12, inicio2: 13, fim2: 17, totalHoras: 8 };
-  }
-  // Segunda a Quinta
-  return { inicio1: 8, fim1: 12, inicio2: 13, fim2: 18, totalHoras: 9 };
-}
-
-/**
- * Calcula as horas úteis entre duas datas
- * Considera apenas horário comercial, excluindo almoço, fins de semana e feriados
- * 
- * Horários:
- * - Seg-Qui: 08:00-12:00 e 13:00-18:00 (9h/dia)
- * - Sexta: 08:00-12:00 e 13:00-17:00 (8h/dia)
- */
-function calcularHorasUteis(dataInicio: Date, dataFim: Date): number {
-  if (isNaN(dataInicio.getTime()) || isNaN(dataFim.getTime())) {
-    return 0;
-  }
-  
-  if (dataFim <= dataInicio) {
-    return 0;
-  }
-  
-  let horasUteis = 0;
-  
-  // Itera dia a dia entre as duas datas
-  const currentDay = new Date(dataInicio.getFullYear(), dataInicio.getMonth(), dataInicio.getDate());
-  const lastDay = new Date(dataFim.getFullYear(), dataFim.getMonth(), dataFim.getDate());
-  
-  let diasProcessados = 0;
-  const maxDias = 365;
-  
-  while (currentDay <= lastDay && diasProcessados < maxDias) {
-    if (isDiaUtil(currentDay)) {
-      const dayOfWeek = currentDay.getDay();
-      const horario = getHorasTrabalho(dayOfWeek);
-      
-      // Verifica se é o primeiro dia, último dia, ou dia intermediário
-      const isFirstDay = currentDay.getTime() === new Date(dataInicio.getFullYear(), dataInicio.getMonth(), dataInicio.getDate()).getTime();
-      const isLastDay = currentDay.getTime() === lastDay.getTime();
-      
-      if (isFirstDay && isLastDay) {
-        // Mesmo dia: calcula apenas o período entre início e fim
-        horasUteis += calcularHorasNoDia(dataInicio, dataFim, horario);
-      } else if (isFirstDay) {
-        // Primeiro dia: do horário de início até o fim do expediente
-        const fimDoDia = new Date(currentDay.getTime());
-        fimDoDia.setHours(horario.fim2, 0, 0, 0);
-        horasUteis += calcularHorasNoDia(dataInicio, fimDoDia, horario);
-      } else if (isLastDay) {
-        // Último dia: do início do expediente até o horário de fim
-        const inicioDoDia = new Date(currentDay.getTime());
-        inicioDoDia.setHours(horario.inicio1, 0, 0, 0);
-        horasUteis += calcularHorasNoDia(inicioDoDia, dataFim, horario);
-      } else {
-        // Dia intermediário: conta o dia inteiro de trabalho
-        horasUteis += horario.totalHoras;
-      }
-    }
-    
-    currentDay.setDate(currentDay.getDate() + 1);
-    diasProcessados++;
-  }
-  
-  return Math.round(horasUteis * 10) / 10;
-}
-
-/**
- * Calcula as horas trabalhadas em um único dia, dado um período
- */
-function calcularHorasNoDia(
-  inicio: Date, 
-  fim: Date, 
-  horario: { inicio1: number; fim1: number; inicio2: number; fim2: number }
-): number {
-  let horas = 0;
-  
-  const inicioHora = inicio.getHours() + inicio.getMinutes() / 60;
-  const fimHora = fim.getHours() + fim.getMinutes() / 60;
-  
-  // Período da manhã (ex: 08:00-12:00)
-  const manhaInicio = Math.max(inicioHora, horario.inicio1);
-  const manhaFim = Math.min(fimHora, horario.fim1);
-  if (manhaFim > manhaInicio && inicioHora < horario.fim1 && fimHora > horario.inicio1) {
-    horas += manhaFim - manhaInicio;
-  }
-  
-  // Período da tarde (ex: 13:00-18:00)
-  const tardeInicio = Math.max(inicioHora, horario.inicio2);
-  const tardeFim = Math.min(fimHora, horario.fim2);
-  if (tardeFim > tardeInicio && inicioHora < horario.fim2 && fimHora > horario.inicio2) {
-    horas += tardeFim - tardeInicio;
-  }
-  
-  return Math.max(0, horas);
-}
-
-/**
- * Busca as tarefas de um ticket e retorna o total de horas trabalhadas
+ * Busca as tarefas de um ticket e retorna apenas apontamentos dos colaboradores RPA.
  * GET /Ticket/{id}/TicketTask
  */
-async function fetchTicketWorkHours(ticketId: string): Promise<number> {
-  // Verifica cache
-  if (ticketHoursCache.has(ticketId)) {
-    return ticketHoursCache.get(ticketId)!;
+async function fetchTicketTaskEntries(ticketId: string): Promise<TicketTaskEntry[]> {
+  if (ticketTaskCache.has(ticketId)) {
+    return ticketTaskCache.get(ticketId)!;
   }
   
   if (!ticketId || ticketId === 'null' || ticketId === '') {
-    return 0;
+    return [];
   }
   
   const token = await getValidSessionToken();
@@ -219,59 +133,79 @@ async function fetchTicketWorkHours(ticketId: string): Promise<number> {
     });
     
     if (!response.ok) {
-      // Ticket pode não ter tasks, retorna 0
-      ticketHoursCache.set(ticketId, 0);
-      return 0;
+      // Ticket pode não ter tasks, retorna lista vazia
+      ticketTaskCache.set(ticketId, []);
+      return [];
     }
     
     const tasks = await response.json();
     
     if (!Array.isArray(tasks)) {
-      ticketHoursCache.set(ticketId, 0);
-      return 0;
+      ticketTaskCache.set(ticketId, []);
+      return [];
     }
     
-    // Soma o actiontime de todas as tasks (em segundos)
-    let totalSeconds = 0;
-    for (const task of tasks) {
-      if (task.actiontime && typeof task.actiontime === 'number') {
-        totalSeconds += task.actiontime;
+    const entries: TicketTaskEntry[] = [];
+
+    for (const rawTask of tasks as Record<string, unknown>[]) {
+      const actionTime = toNumber(rawTask.actiontime);
+      if (!actionTime || actionTime <= 0) {
+        continue;
       }
+
+      const collaborator = await resolveTaskCollaborator(rawTask);
+
+      if (!collaborator) {
+        continue;
+      }
+
+      const categoryId = toNumber(rawTask.taskcategories_id);
+      const taskId = rawTask.id ?? rawTask['2'] ?? `${ticketId}-${entries.length + 1}`;
+      const taskDate = rawTask.date ?? rawTask.date_creation ?? rawTask.date_mod ?? null;
+      const content = rawTask.content ?? rawTask.name ?? '';
+      const hours = Math.round((actionTime / 3600) * 10) / 10;
+
+      entries.push({
+        id: String(taskId),
+        ticket_id: ticketId,
+        collaborator,
+        category_id: categoryId,
+        kind: getTaskKind(categoryId),
+        hours,
+        content: String(content).replace(/<[^>]+>/g, '').trim(),
+        date: taskDate ? String(taskDate) : null,
+      });
     }
-    
-    // Converte para horas (arredonda para 1 casa decimal)
-    const totalHours = Math.round((totalSeconds / 3600) * 10) / 10;
-    
-    // Armazena no cache
-    ticketHoursCache.set(ticketId, totalHours);
-    
-    return totalHours;
+
+    ticketTaskCache.set(ticketId, entries);
+
+    return entries;
   } catch (error) {
     console.warn(`[GLPI] Erro ao buscar tasks do ticket ${ticketId}:`, error);
-    ticketHoursCache.set(ticketId, 0);
-    return 0;
+    ticketTaskCache.set(ticketId, []);
+    return [];
   }
 }
 
 /**
- * Busca as horas trabalhadas de múltiplos tickets
+ * Busca os apontamentos de múltiplos tickets.
  * Exportada para ser usada sob demanda (quando há filtros aplicados)
  */
-export async function fetchMultipleTicketWorkHours(ticketIds: string[]): Promise<Map<string, number>> {
+export async function fetchMultipleTicketTaskEntries(ticketIds: string[]): Promise<Map<string, TicketTaskEntry[]>> {
   // Filtra IDs que não estão no cache
-  const idsToFetch = ticketIds.filter(id => !ticketHoursCache.has(id));
+  const idsToFetch = ticketIds.filter(id => !ticketTaskCache.has(id));
   
   if (idsToFetch.length === 0) {
-    return ticketHoursCache;
+    return ticketTaskCache;
   }
   
-  console.log(`[GLPI] Buscando horas trabalhadas de ${idsToFetch.length} tickets...`);
+  console.log(`[GLPI] Buscando apontamentos de ${idsToFetch.length} tickets...`);
   
   // Busca em lotes para não sobrecarregar a API
   const batchSize = 5; // Reduzido para evitar sobrecarga
   for (let i = 0; i < idsToFetch.length; i += batchSize) {
     const batch = idsToFetch.slice(i, i + batchSize);
-    await Promise.allSettled(batch.map(id => fetchTicketWorkHours(id)));
+    await Promise.allSettled(batch.map(id => fetchTicketTaskEntries(id)));
     
     // Delay entre lotes para não sobrecarregar
     if (i + batchSize < idsToFetch.length) {
@@ -279,7 +213,7 @@ export async function fetchMultipleTicketWorkHours(ticketIds: string[]): Promise
     }
   }
   
-  return ticketHoursCache;
+  return ticketTaskCache;
 }
 
 /**
@@ -314,7 +248,7 @@ async function createSession(): Promise<string> {
   sessionToken = data.session_token;
   sessionExpiry = Date.now() + SESSION_DURATION_MS;
   
-  return sessionToken;
+  return data.session_token as string;
 }
 
 /**
@@ -492,7 +426,7 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
     link: 'AND',
     field: GLPI_FIELDS.TECHNICIAN_GROUP,
     searchtype: 'equals',
-    value: params.entityId || '108', // Padrão: grupo 108 (RPA)
+    value: params.entityId || GLPI_ENTITY_ID || '108', // Padrão: grupo 108 (RPA)
   });
   
   // Filtro por data inicial (data de modificação/fechamento)
@@ -566,7 +500,6 @@ function parseGLPITicket(raw: Record<string, unknown>): Ticket {
   const dateSolved = raw['17'] ?? raw.solvedate ?? null;
   const dateClosed = raw['16'] ?? raw.closedate ?? null;
   const category = raw['7'] ?? raw.category ?? '';
-  const solveDelay = raw['155'] ?? raw.solve_delay_stat ?? null;
   
   // Converte status numérico para texto
   const statusText = typeof status === 'number' 
@@ -595,6 +528,12 @@ function parseGLPITicket(raw: Record<string, unknown>): Ticket {
     tags: String(category),
     technical_group: String(techGroup),
     resolution_time_hours: null, // Será preenchido com horas trabalhadas das tasks
+    planned_time_hours: 0,
+    realized_time_hours: 0,
+    legacy_time_hours: 0,
+    hours_status: 'not_loaded',
+    task_entries: [],
+    collaborator_hours: [],
     created_at: String(dateOpened),
   };
 }

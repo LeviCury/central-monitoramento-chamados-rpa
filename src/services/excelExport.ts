@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { Ticket } from '../types';
+import { formatHoursMinutes } from '../utils/timeFormat';
 
 // Cores da Minerva Foods
 const COLORS = {
@@ -38,6 +39,12 @@ interface ExportMetrics {
   newTickets: number;
   avgWorkHours: number;
   totalWorkHours: number;
+  totalPlannedHours: number;
+  totalRealizedHours: number;
+  totalLegacyHours: number;
+  hoursBalance: number;
+  hoursBalanceType: 'gain' | 'loss' | 'neutral';
+  pendingHoursNotes: number;
 }
 
 interface ExportOptions {
@@ -73,6 +80,34 @@ function formatTechnicianName(name: string | undefined): string {
     return `${parts[1]} ${parts[0]}`;
   }
   return name;
+}
+
+function getHoursStatusLabel(status: Ticket['hours_status']): string {
+  const labels: Record<Ticket['hours_status'], string> = {
+    not_loaded: 'Não carregado',
+    complete: 'Completo',
+    missing_planned: 'Falta planejado',
+    missing_realized: 'Falta realizado',
+    missing_both: 'Faltam ambos',
+    legacy: 'Legado',
+    no_rpa_tasks: 'Sem apontamentos RPA',
+  };
+
+  return labels[status];
+}
+
+function joinTaskContents(tasks: { content: string }[]): string {
+  const contents = tasks
+    .map(task => task.content.trim())
+    .filter(Boolean);
+
+  return contents.length > 0 ? contents.join('\n---\n') : '-';
+}
+
+function getHoursBalanceLabel(balance: number): string {
+  if (balance > 0) return `Ganho de ${formatHoursMinutes(balance)}`;
+  if (balance < 0) return `Perda de ${formatHoursMinutes(Math.abs(balance))}`;
+  return 'Sem variação';
 }
 
 export async function exportToExcel({ tickets, metrics, dateRange, fileName }: ExportOptions): Promise<void> {
@@ -221,9 +256,40 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
     });
   });
 
+  // Totais de horas
+  summarySheet.mergeCells('B19:F19');
+  const hoursTitleCell = summarySheet.getCell('B19');
+  hoursTitleCell.value = 'HORAS APONTADAS';
+  hoursTitleCell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: COLORS.navy } };
+  hoursTitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+  const hoursData = [
+    ['Planejado', formatHoursMinutes(metrics.totalPlannedHours)],
+    ['Realizado', formatHoursMinutes(metrics.totalRealizedHours)],
+    ['Saldo Planejado x Realizado', getHoursBalanceLabel(metrics.hoursBalance)],
+    ['Legado', formatHoursMinutes(metrics.totalLegacyHours)],
+    ['Pendências', metrics.pendingHoursNotes],
+  ];
+
+  hoursData.forEach((row, rowIndex) => {
+    const excelRow = summarySheet.getRow(21 + rowIndex);
+    row.forEach((value, colIndex) => {
+      const cell = excelRow.getCell(colIndex + 2);
+      cell.value = value;
+      cell.font = { name: 'Calibri', size: 11, bold: colIndex === 0, color: { argb: COLORS.navy } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowIndex % 2 === 0 ? COLORS.gray50 : COLORS.white } };
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.gray200 } },
+        left: { style: 'thin', color: { argb: COLORS.gray200 } },
+        bottom: { style: 'thin', color: { argb: COLORS.gray200 } },
+        right: { style: 'thin', color: { argb: COLORS.gray200 } },
+      };
+    });
+  });
+
   // Data de geração
-  summarySheet.mergeCells('B20:F20');
-  const footerCell = summarySheet.getCell('B20');
+  summarySheet.mergeCells('B27:F27');
+  const footerCell = summarySheet.getCell('B27');
   footerCell.value = `Relatório gerado em ${new Date().toLocaleString('pt-BR')} | Central de Monitoramento RPA - Minerva Foods`;
   footerCell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: COLORS.gray500 } };
   footerCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -242,12 +308,17 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
     { width: 60 },  // B - Título
     { width: 25 },  // C - Status
     { width: 30 },  // D - Técnico
-    { width: 20 },  // E - Data Abertura
-    { width: 20 },  // F - Última Atualização
+    { width: 16 },  // E - Planejado
+    { width: 16 },  // F - Realizado
+    { width: 26 },  // G - Saldo
+    { width: 16 },  // H - Legado
+    { width: 24 },  // I - Status horas
+    { width: 20 },  // J - Data Abertura
+    { width: 20 },  // K - Última Atualização
   ];
 
   // Título da planilha
-  ticketsSheet.mergeCells('A1:F1');
+  ticketsSheet.mergeCells('A1:K1');
   const ticketsTitleCell = ticketsSheet.getCell('A1');
   ticketsTitleCell.value = '📋 LISTA COMPLETA DE CHAMADOS';
   ticketsTitleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
@@ -256,7 +327,7 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
   ticketsSheet.getRow(1).height = 35;
 
   // Info do período
-  ticketsSheet.mergeCells('A2:F2');
+  ticketsSheet.mergeCells('A2:K2');
   const ticketsPeriodCell = ticketsSheet.getCell('A2');
   ticketsPeriodCell.value = `${periodText} | Total: ${tickets.length} chamados`;
   ticketsPeriodCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
@@ -265,7 +336,19 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
   ticketsSheet.getRow(2).height = 22;
 
   // Cabeçalho da tabela
-  const headers = ['ID', 'Título', 'Status', 'Técnico Responsável', 'Data Abertura', 'Última Atualização'];
+  const headers = [
+    'ID',
+    'Título',
+    'Status',
+    'Técnico Responsável',
+    'Horas Planejadas',
+    'Horas Realizadas',
+    'Saldo Planejado x Realizado',
+    'Horas Legado',
+    'Status Apontamento',
+    'Data Abertura',
+    'Última Atualização',
+  ];
   const headerRow = ticketsSheet.getRow(3);
   headerRow.height = 30;
 
@@ -319,22 +402,58 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
     techCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     techCell.alignment = { horizontal: 'left', vertical: 'middle' };
 
+    // Horas Planejadas
+    const plannedCell = row.getCell(5);
+    plannedCell.value = formatHoursMinutes(ticket.planned_time_hours);
+    plannedCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
+    plannedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    plannedCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Horas Realizadas
+    const realizedCell = row.getCell(6);
+    realizedCell.value = formatHoursMinutes(ticket.realized_time_hours);
+    realizedCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.green } };
+    realizedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    realizedCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Saldo Planejado x Realizado
+    const balanceCell = row.getCell(7);
+    const ticketBalance = (ticket.planned_time_hours || 0) - (ticket.realized_time_hours || 0);
+    balanceCell.value = getHoursBalanceLabel(ticketBalance);
+    balanceCell.font = { name: 'Calibri', size: 10, color: { argb: ticketBalance < 0 ? COLORS.red : COLORS.green } };
+    balanceCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    balanceCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Horas Legado
+    const legacyCell = row.getCell(8);
+    legacyCell.value = formatHoursMinutes(ticket.legacy_time_hours);
+    legacyCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.amber } };
+    legacyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    legacyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // Status Apontamento
+    const hoursStatusCell = row.getCell(9);
+    hoursStatusCell.value = getHoursStatusLabel(ticket.hours_status);
+    hoursStatusCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
+    hoursStatusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+    hoursStatusCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
     // Data Abertura
-    const dateCell = row.getCell(5);
+    const dateCell = row.getCell(10);
     dateCell.value = formatDate(ticket.created_at);
     dateCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.gray500 } };
     dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Última Atualização
-    const updateCell = row.getCell(6);
-    updateCell.value = formatDate(ticket.updated_at || ticket.created_at);
+    const updateCell = row.getCell(11);
+    updateCell.value = formatDate(ticket.updated_date || ticket.created_at);
     updateCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.gray500 } };
     updateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     updateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Bordas para todas as células
-    [1, 2, 3, 4, 5, 6].forEach(col => {
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(col => {
       row.getCell(col).border = {
         top: { style: 'thin', color: { argb: COLORS.gray200 } },
         left: { style: 'thin', color: { argb: COLORS.gray200 } },
@@ -347,7 +466,123 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
   // Adicionar filtros
   ticketsSheet.autoFilter = {
     from: { row: 3, column: 1 },
-    to: { row: tickets.length + 3, column: 6 },
+    to: { row: tickets.length + 3, column: 11 },
+  };
+
+  // ==========================================
+  // PLANILHA 3: APONTAMENTOS DETALHADOS
+  // ==========================================
+  const tasksSheet = workbook.addWorksheet('Apontamentos', {
+    properties: { tabColor: { argb: COLORS.amber } },
+    views: [{ state: 'frozen', ySplit: 3 }],
+  });
+
+  tasksSheet.columns = [
+    { width: 12 },
+    { width: 50 },
+    { width: 35 },
+    { width: 55 },
+    { width: 18 },
+    { width: 55 },
+    { width: 18 },
+    { width: 55 },
+    { width: 18 },
+    { width: 24 },
+  ];
+
+  tasksSheet.mergeCells('A1:J1');
+  const tasksTitleCell = tasksSheet.getCell('A1');
+  tasksTitleCell.value = 'APONTAMENTOS POR CHAMADO E COLABORADOR';
+  tasksTitleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
+  tasksTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navy } };
+  tasksTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  tasksSheet.getRow(1).height = 35;
+
+  tasksSheet.mergeCells('A2:J2');
+  const tasksPeriodCell = tasksSheet.getCell('A2');
+  tasksPeriodCell.value = periodText;
+  tasksPeriodCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
+  tasksPeriodCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.gray100 } };
+  tasksPeriodCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+  const taskHeaders = [
+    'ID Chamado',
+    'Título',
+    'Colaborador',
+    'Apontamento Planejado',
+    'Horas Planejadas',
+    'Apontamento Realizado',
+    'Horas Realizadas',
+    'Apontamento Legado',
+    'Horas Legado',
+    'Status Apontamento',
+  ];
+  const taskHeaderRow = tasksSheet.getRow(3);
+  taskHeaders.forEach((header, index) => {
+    const cell = taskHeaderRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyLight } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+
+  const taskRows = tickets.flatMap(ticket =>
+    ticket.collaborator_hours.map(collaborator => {
+      const plannedTasks = collaborator.tasks.filter(task => task.kind === 'planned');
+      const realizedTasks = collaborator.tasks.filter(task => task.kind === 'realized');
+      const legacyTasks = collaborator.tasks.filter(task => task.kind === 'legacy');
+
+      return {
+        ticket,
+        collaborator: collaborator.collaborator,
+        plannedContent: joinTaskContents(plannedTasks),
+        plannedHours: collaborator.planned_hours,
+        realizedContent: joinTaskContents(realizedTasks),
+        realizedHours: collaborator.realized_hours,
+        legacyContent: joinTaskContents(legacyTasks),
+        legacyHours: collaborator.legacy_hours,
+      };
+    })
+  );
+
+  taskRows.forEach((taskRow, index) => {
+    const row = tasksSheet.getRow(index + 4);
+    const bgColor = index % 2 === 0 ? COLORS.white : COLORS.gray50;
+    row.height = 42;
+
+    [
+      `#${taskRow.ticket.id}`,
+      taskRow.ticket.title,
+      taskRow.collaborator,
+      taskRow.plannedContent,
+      formatHoursMinutes(taskRow.plannedHours),
+      taskRow.realizedContent,
+      formatHoursMinutes(taskRow.realizedHours),
+      taskRow.legacyContent,
+      formatHoursMinutes(taskRow.legacyHours),
+      getHoursStatusLabel(taskRow.ticket.hours_status),
+    ].forEach((value, colIndex) => {
+      const cell = row.getCell(colIndex + 1);
+      cell.value = value;
+      cell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = {
+        horizontal: [3, 5, 7].includes(colIndex) ? 'left' : 'center',
+        vertical: 'middle',
+        wrapText: [1, 3, 5, 7].includes(colIndex),
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.gray200 } },
+        left: { style: 'thin', color: { argb: COLORS.gray200 } },
+        bottom: { style: 'thin', color: { argb: COLORS.gray200 } },
+        right: { style: 'thin', color: { argb: COLORS.gray200 } },
+      };
+    });
+  });
+
+  tasksSheet.autoFilter = {
+    from: { row: 3, column: 1 },
+    to: { row: taskRows.length + 3, column: 10 },
   };
 
   // ==========================================

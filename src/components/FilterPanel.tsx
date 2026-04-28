@@ -1,10 +1,15 @@
 import { Calendar, Filter } from 'lucide-react';
 import { FilterState, Category } from '../types';
 
+interface LegacyFilterState extends FilterState {
+  categories: string[];
+  regions: string[];
+}
+
 interface FilterPanelProps {
-  filters: FilterState;
+  filters: LegacyFilterState;
   categories: Category[];
-  onFilterChange: (filters: FilterState) => void;
+  onFilterChange: (filters: LegacyFilterState) => void;
 }
 
 export default function FilterPanel({
@@ -115,6 +120,9 @@ export default function FilterPanel({
           onClick={() =>
             onFilterChange({
               dateRange: { start: '', end: '' },
+              statuses: [],
+              priorities: [],
+              technicians: [],
               categories: [],
               regions: [],
             })

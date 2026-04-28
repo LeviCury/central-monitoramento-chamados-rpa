@@ -34,13 +34,28 @@ function normalizeTicket(raw: Record<string, unknown>): Ticket {
       raw.resolution_time_hours != null || raw.resolutionTimeHours != null
         ? Number(raw.resolution_time_hours ?? raw.resolutionTimeHours)
         : null,
+    planned_time_hours:
+      raw.planned_time_hours != null || raw.plannedTimeHours != null
+        ? Number(raw.planned_time_hours ?? raw.plannedTimeHours)
+        : 0,
+    realized_time_hours:
+      raw.realized_time_hours != null || raw.realizedTimeHours != null
+        ? Number(raw.realized_time_hours ?? raw.realizedTimeHours)
+        : 0,
+    legacy_time_hours:
+      raw.legacy_time_hours != null || raw.legacyTimeHours != null
+        ? Number(raw.legacy_time_hours ?? raw.legacyTimeHours)
+        : 0,
+    hours_status: 'not_loaded',
+    task_entries: [],
+    collaborator_hours: [],
     created_at: String(raw.created_at ?? raw.createdAt ?? ''),
   };
 }
 
 function parseResponse(body: unknown): Ticket[] {
   if (isTicketArray(body)) {
-    return body.map(t => (typeof t === 'object' && t !== null ? normalizeTicket(t as Record<string, unknown>) : t as Ticket));
+    return body.map(t => (typeof t === 'object' && t !== null ? normalizeTicket(t as unknown as Record<string, unknown>) : t));
   }
   if (body && typeof body === 'object') {
     const obj = body as Record<string, unknown>;
