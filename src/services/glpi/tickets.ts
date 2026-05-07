@@ -163,6 +163,26 @@ function resolveTicketType(raw: unknown): 'incident' | 'request' | 'unknown' {
   return 'unknown';
 }
 
+function parseTicketActionSeconds(raw: unknown): number {
+  if (raw == null) return 0;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return 0;
+    // Pode vir formatado como "01h30" / "1h 30min" quando expand_dropdowns=true.
+    // Tenta numero direto primeiro; se falhar, parseia "Xh Ymin".
+    const num = Number(trimmed);
+    if (Number.isFinite(num)) return num;
+    const match = trimmed.match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*min)?/i);
+    if (match) {
+      const h = Number(match[1] || 0);
+      const m = Number(match[2] || 0);
+      return h * 3600 + m * 60;
+    }
+  }
+  return 0;
+}
+
 function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
   const id = raw['2'] ?? raw.id ?? '';
   const title = raw['1'] ?? raw.name ?? '';
@@ -178,6 +198,13 @@ function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
   const dateSolved = raw['17'] ?? raw.solvedate ?? null;
   const dateClosed = raw['16'] ?? raw.closedate ?? null;
   const category = raw['7'] ?? raw.category ?? '';
+  // GLPI ja agrega o tempo de TODAS as TicketTask filhas no campo 49.
+  // Usamos isso como fonte de verdade para "total realizado", sem
+  // depender de buscas task-a-task (que sao caras e podem filtrar
+  // colaborador / categoria).
+  const actionSecondsRaw = (raw as Record<string, unknown>)['49'] ?? raw.actiontime;
+  const actionSeconds = parseTicketActionSeconds(actionSecondsRaw);
+  const realizedHoursFromTicket = Math.round((actionSeconds / 3600) * 10) / 10;
 
   const statusText =
     typeof status === 'number' ? STATUS_MAP[status] ?? `Status ${status}` : String(status);
@@ -202,11 +229,14 @@ function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
     priority: priorityText,
     tags: String(category),
     technical_group: String(techGroup),
-    resolution_time_hours: null,
+    resolution_time_hours: realizedHoursFromTicket || null,
     planned_time_hours: 0,
-    realized_time_hours: 0,
+    // Pre-popula com o agregado do GLPI. Se depois `fetchWorkHoursForTickets`
+    // rodar e trouxer breakdown por colaborador/categoria, sobrescreve com
+    // o detalhamento. Mas garante que NUNCA fica em zero por causa de filtro.
+    realized_time_hours: realizedHoursFromTicket,
     legacy_time_hours: 0,
-    hours_status: 'not_loaded',
+    hours_status: realizedHoursFromTicket > 0 ? 'legacy' : 'not_loaded',
     task_entries: [],
     collaborator_hours: [],
     created_at: String(dateOpened),
@@ -234,6 +264,7 @@ export async function fetchTicketsFromGLPI(params: GLPISearchParams): Promise<Ti
       GLPI_FIELDS.DATE_SOLVED,
       GLPI_FIELDS.DATE_CLOSED,
       GLPI_FIELDS.CATEGORY,
+      GLPI_FIELDS.ACTION_TIME,
       GLPI_FIELDS.SOLVE_DELAY,
     ],
   };

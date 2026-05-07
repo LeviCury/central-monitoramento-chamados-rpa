@@ -23,6 +23,12 @@ export const GLPI_FIELDS = {
   DATE_CLOSED: 16,
   CATEGORY: 7,
   TIME_TO_RESOLVE: 30,
+  /**
+   * 49 = actiontime do ticket. O GLPI ja agrega automaticamente o
+   * tempo de TODAS as TicketTask filhas. Vem em segundos. Usar isso
+   * em vez de buscar task-a-task evita 758 requests adicionais.
+   */
+  ACTION_TIME: 49,
   SOLVE_DELAY: 155,
 } as const;
 

@@ -173,20 +173,44 @@ function applyTaskBreakdownToTicket(
   const planned = sumByKind('planned');
   const realized = sumByKind('realized');
   const legacy = sumByKind('legacy');
+  const totalFromTasks = realized + legacy;
 
-  ticket.planned_time_hours = planned;
-  ticket.realized_time_hours = realized;
-  ticket.legacy_time_hours = legacy;
-  ticket.resolution_time_hours = roundHours(realized + legacy);
+  // PRIORIDADE: o agregado oficial vem do ticket (campo 49 = actiontime),
+  // ja populado em parseGLPITicket. So sobrescrevemos com o detalhamento
+  // por colaborador/categoria SE ele encontrar algo (totalFromTasks > 0).
+  // Caso contrario (filtro de whitelist vazio, categoria desconhecida etc.)
+  // preservamos o numero do GLPI para o card nao mentir 0h.
   ticket.task_entries = taskEntries;
   ticket.collaborator_hours = aggregateCollaboratorHours(taskEntries);
-  ticket.hours_status = getHoursStatus(
-    ticket,
-    planned,
-    realized,
-    legacy,
-    firstStructuredTaskDate
-  );
+
+  if (totalFromTasks > 0) {
+    ticket.planned_time_hours = planned;
+    ticket.realized_time_hours = realized;
+    ticket.legacy_time_hours = legacy;
+    ticket.resolution_time_hours = roundHours(totalFromTasks);
+    ticket.hours_status = getHoursStatus(
+      ticket,
+      planned,
+      realized,
+      legacy,
+      firstStructuredTaskDate
+    );
+  } else if ((ticket.realized_time_hours || 0) > 0) {
+    // Tem actiontime no ticket mas nada bateu nos filtros das tasks:
+    // mantemos as horas oficiais como "legacy" para indicar que nao
+    // ha breakdown por colaborador / categoria.
+    ticket.legacy_time_hours = ticket.realized_time_hours || 0;
+    ticket.realized_time_hours = 0;
+    ticket.resolution_time_hours = ticket.legacy_time_hours;
+    ticket.hours_status = 'legacy';
+  } else {
+    // Nem o ticket nem as tasks tem horas: zeramos tudo limpo.
+    ticket.planned_time_hours = 0;
+    ticket.realized_time_hours = 0;
+    ticket.legacy_time_hours = 0;
+    ticket.resolution_time_hours = null;
+    ticket.hours_status = getHoursStatus(ticket, 0, 0, 0, firstStructuredTaskDate);
+  }
 }
 
 // ======================================================
