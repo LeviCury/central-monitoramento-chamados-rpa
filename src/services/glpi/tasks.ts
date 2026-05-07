@@ -29,6 +29,11 @@ const taskDiagStats = {
   acceptedLegacy: 0,
   uniqueCategoryIds: new Set<number>(),
   uniqueUserIds: new Set<string>(),
+  /**
+   * Mapa de id -> nome resolvido para os colaboradores rejeitados.
+   * Permite ver "quem sao essas pessoas" sem precisar abrir o GLPI.
+   */
+  rejectedCollaboratorNames: new Map<string, string>(),
 };
 function logTaskDiagSample(
   ticketId: string,
@@ -51,18 +56,33 @@ function logTaskDiagSample(
 }
 function flushTaskDiagStats() {
   if (taskDiagStats.totalTasksSeen === 0) return;
-  console.log('[GLPI][diag] resumo de apontamentos:', {
-    ...taskDiagStats,
-    uniqueCategoryIds: Array.from(taskDiagStats.uniqueCategoryIds).sort(
-      (a, b) => a - b
-    ),
-    uniqueUserIds: Array.from(taskDiagStats.uniqueUserIds).slice(0, 30),
-    configuracaoAtual: {
-      plannedTaskCategoryId: config.glpi.plannedTaskCategoryId,
-      realizedTaskCategoryId: config.glpi.realizedTaskCategoryId,
-      colaboradoresPermitidos: config.collaborators.map(c => c.canonical),
-    },
-  });
+  const rejectedNames = Array.from(taskDiagStats.rejectedCollaboratorNames.entries())
+    .map(([id, name]) => `${name} (id=${id})`)
+    .sort();
+  // Imprime tudo em texto puro pra nao precisar expandir Object no DevTools
+  console.log(
+    '[GLPI][diag] === resumo de apontamentos ===\n' +
+      `  totalTasksSeen: ${taskDiagStats.totalTasksSeen}\n` +
+      `  rejectedNoActionTime: ${taskDiagStats.rejectedNoActionTime}\n` +
+      `  rejectedNoCollaborator: ${taskDiagStats.rejectedNoCollaborator}\n` +
+      `  acceptedPlanned:  ${taskDiagStats.acceptedPlanned}\n` +
+      `  acceptedRealized: ${taskDiagStats.acceptedRealized}\n` +
+      `  acceptedLegacy:   ${taskDiagStats.acceptedLegacy}\n` +
+      `  uniqueCategoryIds: [${Array.from(taskDiagStats.uniqueCategoryIds)
+        .sort((a, b) => a - b)
+        .join(', ')}]\n` +
+      `  uniqueUserIds (qtd=${taskDiagStats.uniqueUserIds.size}): [${Array.from(
+        taskDiagStats.uniqueUserIds
+      )
+        .slice(0, 30)
+        .join(', ')}]\n` +
+      `  configuracao: planned=${config.glpi.plannedTaskCategoryId} realized=${config.glpi.realizedTaskCategoryId}\n` +
+      `  colaboradoresPermitidos (qtd=${config.collaborators.length}): [${config.collaborators
+        .map(c => c.canonical)
+        .join(' | ')}]\n` +
+      `  REJEITADOS POR WHITELIST (${rejectedNames.length}):\n` +
+      (rejectedNames.length === 0 ? '    (nenhum)' : '    - ' + rejectedNames.join('\n    - '))
+  );
 }
 
 function toNumber(value: unknown): number | null {
@@ -86,20 +106,28 @@ function getTaskUserId(task: Record<string, unknown>): string {
   return userId == null ? '' : String(userId);
 }
 
+interface TaskCollaboratorResolution {
+  /** Nome canonico permitido pela whitelist (ou null se nao permitido). */
+  collaborator: string | null;
+  /** Nome real resolvido no GLPI, mesmo quando NAO permitido. Util pra log. */
+  resolvedName: string;
+}
+
 async function resolveTaskCollaborator(
   task: Record<string, unknown>
-): Promise<string | null> {
+): Promise<TaskCollaboratorResolution> {
   const taskUser = getTaskUserId(task);
-  if (!taskUser) return null;
+  if (!taskUser) return { collaborator: null, resolvedName: '' };
 
   const directMatch = getAllowedCollaboratorName(taskUser);
-  if (directMatch) return directMatch;
+  if (directMatch) return { collaborator: directMatch, resolvedName: directMatch };
 
   if (/^\d+$/.test(taskUser)) {
     const resolvedUser = await fetchUserName(taskUser);
-    return getAllowedCollaboratorName(resolvedUser);
+    const allowed = getAllowedCollaboratorName(resolvedUser);
+    return { collaborator: allowed, resolvedName: resolvedUser || `#${taskUser}` };
   }
-  return null;
+  return { collaborator: null, resolvedName: taskUser };
 }
 
 export async function fetchTicketTaskEntries(
@@ -140,10 +168,20 @@ export async function fetchTicketTaskEntries(
         continue;
       }
 
-      const collaborator = await resolveTaskCollaborator(rawTask);
-      if (!collaborator) {
+      const resolution = await resolveTaskCollaborator(rawTask);
+      if (!resolution.collaborator) {
         taskDiagStats.rejectedNoCollaborator += 1;
-        logTaskDiagSample(ticketId, rawTask, 'rejected:collaborator_not_in_whitelist');
+        if (rawUserId) {
+          taskDiagStats.rejectedCollaboratorNames.set(
+            rawUserId,
+            resolution.resolvedName || `(sem nome)`
+          );
+        }
+        logTaskDiagSample(
+          ticketId,
+          rawTask,
+          `rejected:collaborator_not_in_whitelist resolvedName="${resolution.resolvedName}"`
+        );
         continue;
       }
 
@@ -157,12 +195,12 @@ export async function fetchTicketTaskEntries(
       else if (kind === 'realized') taskDiagStats.acceptedRealized += 1;
       else taskDiagStats.acceptedLegacy += 1;
 
-      logTaskDiagSample(ticketId, rawTask, 'accepted', kind, collaborator);
+      logTaskDiagSample(ticketId, rawTask, 'accepted', kind, resolution.collaborator);
 
       entries.push({
         id: String(taskId),
         ticket_id: ticketId,
-        collaborator,
+        collaborator: resolution.collaborator,
         category_id: categoryId,
         kind,
         hours,
