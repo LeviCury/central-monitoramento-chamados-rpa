@@ -79,12 +79,14 @@ interface TicketFilterPanelProps {
 export default function TicketFilterPanel({
   filters,
   statuses,
+  priorities,
   technicians,
   onFilterChange,
 }: TicketFilterPanelProps) {
   const [expandedSections, setExpandedSections] = useState({
     period: true,
     status: true,
+    priority: true,
     technician: true,
   });
   const [selectedQuickPeriod, setSelectedQuickPeriod] = useState<QuickPeriod | null>(null);
@@ -109,6 +111,13 @@ export default function TicketFilterPanel({
     onFilterChange({ ...filters, statuses: newStatuses });
   };
 
+  const handlePriorityToggle = (priority: string) => {
+    const newPriorities = filters.priorities.includes(priority)
+      ? filters.priorities.filter(p => p !== priority)
+      : [...filters.priorities, priority];
+    onFilterChange({ ...filters, priorities: newPriorities });
+  };
+
   const handleTechnicianToggle = (technician: string) => {
     const newTechnicians = filters.technicians.includes(technician)
       ? filters.technicians.filter((t) => t !== technician)
@@ -128,12 +137,14 @@ export default function TicketFilterPanel({
     filters.dateRange.start ||
     filters.dateRange.end ||
     filters.statuses.length > 0 ||
+    filters.priorities.length > 0 ||
     filters.technicians.length > 0;
 
-  const activeFilterCount = 
+  const activeFilterCount =
     (filters.dateRange.start ? 1 : 0) +
     (filters.dateRange.end ? 1 : 0) +
     filters.statuses.length +
+    filters.priorities.length +
     filters.technicians.length;
 
   return (
@@ -289,6 +300,56 @@ export default function TicketFilterPanel({
                       className="w-4 h-4 text-minerva-navy border-gray-300 dark:border-slate-500 rounded focus:ring-minerva-navy/20"
                     />
                     <span className="text-sm text-minerva-navy dark:text-white">{status}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Filtro de Prioridade */}
+        {priorities.length > 0 && (
+          <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleSection('priority')}
+              aria-expanded={expandedSections.priority}
+              className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-amber-500 rounded-full" aria-hidden />
+                <span className="text-sm font-medium text-minerva-navy dark:text-white">Prioridade</span>
+                {filters.priorities.length > 0 && (
+                  <span className="px-2 py-0.5 bg-amber-500 text-white text-xs rounded-full">
+                    {filters.priorities.length}
+                  </span>
+                )}
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-minerva-navy/60 dark:text-white/60 transition-transform ${expandedSections.priority ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </button>
+
+            {expandedSections.priority && (
+              <div className="p-4 space-y-2 bg-white dark:bg-slate-800 max-h-48 overflow-y-auto">
+                {priorities.map(priority => (
+                  <label
+                    key={priority}
+                    className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all ${
+                      filters.priorities.includes(priority)
+                        ? 'bg-amber-500/5 dark:bg-amber-500/20 border border-amber-500/30'
+                        : 'hover:bg-gray-50 dark:hover:bg-slate-700 border border-transparent'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={filters.priorities.includes(priority)}
+                      onChange={() => handlePriorityToggle(priority)}
+                      className="w-4 h-4 text-amber-500 border-gray-300 dark:border-slate-500 rounded focus:ring-amber-500/20"
+                      aria-label={`Filtrar por prioridade ${priority}`}
+                    />
+                    <span className="text-sm text-minerva-navy dark:text-white">{priority}</span>
                   </label>
                 ))}
               </div>

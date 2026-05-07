@@ -29,29 +29,16 @@ const STATUS_COLORS: Record<string, string> = {
   'Pendente': 'FFEF4444',
 };
 
-interface ExportMetrics {
-  total: number;
-  closureRate: number;
-  closed: number;
-  solved: number;
-  inProgress: number;
-  pending: number;
-  newTickets: number;
-  avgWorkHours: number;
-  totalWorkHours: number;
-  totalPlannedHours: number;
-  totalRealizedHours: number;
-  totalLegacyHours: number;
-  hoursBalance: number;
-  hoursBalanceType: 'gain' | 'loss' | 'neutral';
-  pendingHoursNotes: number;
-}
+import type { ActionItem, Insight, TicketMetrics } from './analytics';
+import { getTechnicianMetrics, getUniqueTechnicians } from './analytics';
 
 interface ExportOptions {
   tickets: Ticket[];
-  metrics: ExportMetrics;
+  metrics: TicketMetrics;
   dateRange: { start: string; end: string };
   fileName?: string;
+  insights?: Insight[];
+  actionItems?: ActionItem[];
 }
 
 function formatDate(dateStr: string): string {
@@ -110,7 +97,14 @@ function getHoursBalanceLabel(balance: number): string {
   return 'Sem variação';
 }
 
-export async function exportToExcel({ tickets, metrics, dateRange, fileName }: ExportOptions): Promise<void> {
+export async function exportToExcel({
+  tickets,
+  metrics,
+  dateRange,
+  fileName,
+  insights = [],
+  actionItems = [],
+}: ExportOptions): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Central de Monitoramento RPA - Minerva Foods';
   workbook.created = new Date();
@@ -584,6 +578,218 @@ export async function exportToExcel({ tickets, metrics, dateRange, fileName }: E
     from: { row: 3, column: 1 },
     to: { row: taskRows.length + 3, column: 10 },
   };
+
+  // ==========================================
+  // PLANILHA 4: POR TÉCNICO
+  // ==========================================
+  const technicians = getUniqueTechnicians(tickets).filter(Boolean);
+  const techMetrics = technicians.map(t => getTechnicianMetrics(tickets, t));
+
+  const techSheet = workbook.addWorksheet('Por Técnico', {
+    properties: { tabColor: { argb: COLORS.green } },
+    views: [{ state: 'frozen', ySplit: 3 }],
+  });
+
+  techSheet.columns = [
+    { width: 32 },
+    { width: 14 },
+    { width: 14 },
+    { width: 16 },
+    { width: 18 },
+    { width: 18 },
+    { width: 22 },
+    { width: 20 },
+    { width: 22 },
+  ];
+
+  techSheet.mergeCells('A1:I1');
+  const techTitle = techSheet.getCell('A1');
+  techTitle.value = 'KPIs POR TÉCNICO';
+  techTitle.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
+  techTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navy } };
+  techTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+  techSheet.getRow(1).height = 35;
+
+  techSheet.mergeCells('A2:I2');
+  const techPeriod = techSheet.getCell('A2');
+  techPeriod.value = `${periodText} | ${technicians.length} técnico(s)`;
+  techPeriod.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
+  techPeriod.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.gray100 } };
+  techPeriod.alignment = { horizontal: 'center', vertical: 'middle' };
+  techSheet.getRow(2).height = 22;
+
+  const techHeaders = [
+    'Técnico',
+    'Total',
+    'Em Aberto',
+    'Finalizados',
+    'Taxa Resolução',
+    'Parados',
+    'Média dias em aberto',
+    'Horas realizadas',
+    'Média horas/chamado',
+  ];
+  const techHeaderRow = techSheet.getRow(3);
+  techHeaderRow.height = 30;
+  techHeaders.forEach((header, index) => {
+    const cell = techHeaderRow.getCell(index + 1);
+    cell.value = header;
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyLight } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: COLORS.navy } },
+      left: { style: 'thin', color: { argb: COLORS.navy } },
+      bottom: { style: 'medium', color: { argb: COLORS.navy } },
+      right: { style: 'thin', color: { argb: COLORS.navy } },
+    };
+  });
+
+  techMetrics.forEach((tm, index) => {
+    const row = techSheet.getRow(index + 4);
+    row.height = 24;
+    const bgColor = index % 2 === 0 ? COLORS.white : COLORS.gray50;
+    const values: Array<[string | number, string]> = [
+      [formatTechnicianName(tm.technician), 'left'],
+      [tm.total, 'center'],
+      [tm.open, 'center'],
+      [tm.finalized, 'center'],
+      [`${tm.closureRate}%`, 'center'],
+      [tm.staleCount, 'center'],
+      [`${tm.avgDaysOpen.toFixed(1)}d`, 'center'],
+      [formatHoursMinutes(tm.totalRealizedHours), 'center'],
+      [formatHoursMinutes(tm.avgWorkHours), 'center'],
+    ];
+    values.forEach(([value, align], col) => {
+      const cell = row.getCell(col + 1);
+      cell.value = value;
+      cell.font = {
+        name: 'Calibri',
+        size: 10,
+        color: { argb: col === 5 && tm.staleCount > 0 ? COLORS.red : COLORS.navy },
+        bold: col === 0,
+      };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = { horizontal: align as 'left' | 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.gray200 } },
+        left: { style: 'thin', color: { argb: COLORS.gray200 } },
+        bottom: { style: 'thin', color: { argb: COLORS.gray200 } },
+        right: { style: 'thin', color: { argb: COLORS.gray200 } },
+      };
+    });
+  });
+
+  if (techMetrics.length > 0) {
+    techSheet.autoFilter = {
+      from: { row: 3, column: 1 },
+      to: { row: techMetrics.length + 3, column: 9 },
+    };
+  }
+
+  // ==========================================
+  // PLANILHA 5: INSIGHTS & AÇÕES
+  // ==========================================
+  const insightsSheet = workbook.addWorksheet('Insights & Ações', {
+    properties: { tabColor: { argb: COLORS.amber } },
+    views: [{ showGridLines: false }],
+  });
+
+  insightsSheet.columns = [
+    { width: 3 },
+    { width: 18 },
+    { width: 80 },
+    { width: 3 },
+  ];
+
+  insightsSheet.mergeCells('B2:C2');
+  const insTitle = insightsSheet.getCell('B2');
+  insTitle.value = 'LEITURA RÁPIDA E PRÓXIMAS AÇÕES';
+  insTitle.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
+  insTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navy } };
+  insTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+  insightsSheet.getRow(2).height = 32;
+
+  insightsSheet.mergeCells('B3:C3');
+  const insSubtitle = insightsSheet.getCell('B3');
+  insSubtitle.value = periodText;
+  insSubtitle.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
+  insSubtitle.alignment = { horizontal: 'center', vertical: 'middle' };
+  insightsSheet.getRow(3).height = 20;
+
+  let row = 5;
+  insightsSheet.mergeCells(`B${row}:C${row}`);
+  const insListTitle = insightsSheet.getCell(`B${row}`);
+  insListTitle.value = '🔍 LEITURA RÁPIDA';
+  insListTitle.font = { name: 'Calibri', size: 13, bold: true, color: { argb: COLORS.navy } };
+  insightsSheet.getRow(row).height = 26;
+  row++;
+
+  if (insights.length === 0) {
+    insightsSheet.mergeCells(`B${row}:C${row}`);
+    const cell = insightsSheet.getCell(`B${row}`);
+    cell.value = 'Nenhum insight no período.';
+    cell.font = { name: 'Calibri', size: 11, italic: true, color: { argb: COLORS.gray500 } };
+    row++;
+  } else {
+    for (const ins of insights) {
+      const toneColor =
+        ins.tone === 'good'
+          ? COLORS.green
+          : ins.tone === 'warn'
+            ? COLORS.amber
+            : ins.tone === 'bad'
+              ? COLORS.red
+              : COLORS.gray500;
+      const toneLabel = { good: 'Positivo', warn: 'Atenção', bad: 'Crítico', neutral: 'Neutro' }[ins.tone];
+      const toneCell = insightsSheet.getCell(`B${row}`);
+      toneCell.value = toneLabel;
+      toneCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.white } };
+      toneCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toneColor } };
+      toneCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const textCell = insightsSheet.getCell(`C${row}`);
+      textCell.value = `${ins.emoji} ${ins.text}`;
+      textCell.font = { name: 'Calibri', size: 11, color: { argb: COLORS.navy } };
+      textCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+      insightsSheet.getRow(row).height = 24;
+      row++;
+    }
+  }
+
+  row += 2;
+  insightsSheet.mergeCells(`B${row}:C${row}`);
+  const actTitle = insightsSheet.getCell(`B${row}`);
+  actTitle.value = '🎯 PRÓXIMAS AÇÕES';
+  actTitle.font = { name: 'Calibri', size: 13, bold: true, color: { argb: COLORS.navy } };
+  insightsSheet.getRow(row).height = 26;
+  row++;
+
+  if (actionItems.length === 0) {
+    insightsSheet.mergeCells(`B${row}:C${row}`);
+    const cell = insightsSheet.getCell(`B${row}`);
+    cell.value = 'Nenhuma ação prioritária identificada.';
+    cell.font = { name: 'Calibri', size: 11, italic: true, color: { argb: COLORS.gray500 } };
+    row++;
+  } else {
+    for (const a of actionItems) {
+      const sevColor =
+        a.severity === 'high' ? COLORS.red : a.severity === 'medium' ? COLORS.amber : COLORS.gray500;
+      const sevLabel = { high: 'Alta', medium: 'Média', low: 'Baixa' }[a.severity];
+      const sevCell = insightsSheet.getCell(`B${row}`);
+      sevCell.value = `${sevLabel} (${a.count})`;
+      sevCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.white } };
+      sevCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: sevColor } };
+      sevCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const textCell = insightsSheet.getCell(`C${row}`);
+      textCell.value = `${a.title}\n${a.description}`;
+      textCell.font = { name: 'Calibri', size: 11, color: { argb: COLORS.navy } };
+      textCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+      insightsSheet.getRow(row).height = 36;
+      row++;
+    }
+  }
 
   // ==========================================
   // GERAR E BAIXAR ARQUIVO

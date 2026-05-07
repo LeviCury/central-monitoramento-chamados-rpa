@@ -1,33 +1,3 @@
-export interface Metric {
-  id: string;
-  name: string;
-  value: number;
-  previous_value: number;
-  change_percentage: number;
-  category: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface SalesData {
-  id: string;
-  date: string;
-  category: string;
-  revenue: number;
-  quantity: number;
-  region: string;
-  product: string;
-  created_at: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  type: string;
-  active: boolean;
-  created_at: string;
-}
-
 export type TicketTaskKind = 'planned' | 'realized' | 'legacy';
 
 export type TicketHoursStatus =

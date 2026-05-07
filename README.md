@@ -13,7 +13,10 @@
   <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript" alt="TypeScript"/>
   <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite" alt="Vite"/>
   <img src="https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=flat-square&logo=tailwindcss" alt="TailwindCSS"/>
+  <img src="https://img.shields.io/badge/TanStack_Query-5-FF4154?style=flat-square&logo=reactquery" alt="TanStack Query"/>
   <img src="https://img.shields.io/badge/Recharts-3.7-FF6384?style=flat-square" alt="Recharts"/>
+  <img src="https://img.shields.io/badge/Zod-3-3068B7?style=flat-square" alt="Zod"/>
+  <img src="https://img.shields.io/badge/PWA-Ready-5A0FC8?style=flat-square&logo=pwa" alt="PWA"/>
   <img src="https://img.shields.io/badge/ExcelJS-4.4-217346?style=flat-square&logo=microsoftexcel" alt="ExcelJS"/>
 </p>
 
@@ -69,30 +72,47 @@ Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coor
 
 | KPI | Descrição |
 |-----|-----------|
-| **Total de Chamados** | Quantidade total de chamados no período selecionado |
-| **Taxa de Resolução** | Percentual de chamados finalizados (fechados + solucionados) |
-| **Chamados em Aberto** | Soma de chamados em atendimento, pendentes e novos |
-| **Média de Horas** | Média de horas trabalhadas por chamado (requer filtro de data) |
+| **Total de Chamados** | Quantidade total de chamados no período selecionado, com delta % vs período anterior |
+| **Taxa de Resolução** | Percentual de chamados finalizados (fechados + solucionados), com delta vs período anterior |
+| **Chamados em Aberto** | Soma de em atendimento + pendentes + novos, com delta vs período anterior |
+| **Chamados Parados** | Quantidade de chamados em aberto há mais de `VITE_STALE_DAYS` dias (padrão 7), com média de dias em aberto e delta vs período anterior |
+| **Média de Horas** | Média de horas trabalhadas por chamado **com apontamento** |
+| **Saldo de Horas** | Ganho/perda do realizado vs planejado (KPI executivo) |
 
-### 📈 Gráficos Interativos
+> Quando há filtro de data ativo, todos os KPIs principais mostram **comparação com o período anterior equivalente** (delta % colorido).
 
-- **Evolução de Chamados**: Gráfico de área mostrando a quantidade de chamados por dia
-- **Distribuição por Status**: Gráfico de barras com a quantidade de chamados por status
-- **Chamados por Técnico**: Ranking dos técnicos com mais chamados atendidos
+### 📈 Gráficos Interativos (com drill-down)
+
+- **Evolução de Chamados**: gráfico de área com chamados por dia + **projeção dos próximos 7 dias** (regressão linear)
+- **Planejado x Realizado**: barras agrupadas por colaborador RPA
+- **Distribuição por Status**: barras com quantidade por status — **clique na barra ou na legenda para filtrar**
+- **Chamados por Técnico**: ranking horizontal — **clique na barra para filtrar pelo técnico**
+- **Heatmap de Aberturas**: mapa de calor dia-da-semana × hora para identificar picos de demanda
 
 ### 🔍 Filtros Avançados
 
-- **Período**: Filtro por data inicial e final
-- **Status**: Filtro por status do chamado (Fechado, Solucionado, Em Atendimento, etc.)
-- **Técnico**: Filtro por técnico responsável
+- **Período**: filtros rápidos (Hoje, 7d, 30d, este/último mês) + datas manuais
+- **Status**, **Prioridade** e **Técnico**: seleção múltipla
+- **Drill-down**: clique em qualquer gráfico para aplicar/remover filtro
+- **URL compartilhável**: filtros viram query params (`?start=...&status=Pendente`)
+- **Presets em localStorage**: salve combinações de filtros nomeadas e reaplique com 1 clique
+
+### ⏰ Tempo em aberto / Chamados parados
+
+> O projeto **não inventa SLA**. Em vez disso usa um indicador honesto baseado em dado real: há quantos dias um chamado em aberto está sem ser fechado.
+
+- Limite configurável (`VITE_STALE_DAYS`, padrão `7` dias)
+- KPI **Chamados Parados**: quantos chamados em aberto passaram do limite, com a média de dias em aberto
+- Badge **"Parado há Xd"** automático na tabela de chamados
 
 ### 📋 Tabela de Chamados
 
-- Listagem completa de chamados
+- Listagem completa com **ordenação clicável por coluna** (ID, título, status, técnico, horas, data)
 - Busca em tempo real por ID, título ou técnico
 - Paginação automática
 - Link direto para o chamado no GLPI
-- Badges de status coloridos
+- Badges de status coloridos + alerta visual de chamados parados e apontamentos pendentes
+- Painel lateral com detalhes do chamado e apontamentos por colaborador
 
 ### 🌙 Tema Claro/Escuro
 
@@ -101,12 +121,18 @@ Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coor
 - Detecção automática da preferência do sistema
 - Logos adaptativas para cada tema
 
-### 🎥 Modo Apresentação
+### 🎥 Modo Apresentação + Modo TV
 
-- Interface otimizada para apresentações em reuniões
-- Oculta filtros para foco nos dados
+- Interface fullscreen otimizada para reuniões (atalho **Ctrl+P**)
 - KPIs em destaque com tamanho ampliado
-- Barra flutuante com controles e indicador de última atualização
+- **Modo TV** (atalho **T** dentro da apresentação): slideshow rotativo entre KPIs, Evolução, Planejado x Realizado, Status & Técnicos e Heatmap a cada 12s — perfeito para um monitor fixo na parede da equipe RPA
+- Saída com **Esc**
+
+### 🏷️ Multi-grupo
+
+- Suporte a múltiplos grupos técnicos via `VITE_GLPI_GROUPS=108:RPA|110:Infra|...`
+- Seletor no header (aparece automaticamente quando há mais de um grupo)
+- Preferência persistida em `localStorage`
 
 ### 📥 Exportação para Excel
 
@@ -116,11 +142,18 @@ Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coor
 - Filtros automáticos na planilha
 - Download instantâneo em formato `.xlsx`
 
-### 🔄 Auto-Refresh
+### 🔄 Auto-Refresh + Toasts
 
-- Atualização automática a cada 20 minutos
-- Indicador visual de última atualização
-- Tempo relativo ("há 5 minutos", "há 1 hora")
+- Atualização automática via TanStack Query a cada 20 minutos
+- Indicador visual de última atualização ("há 5 minutos", "há 1 hora")
+- Toasts discretos de feedback para refresh, exportação e erros
+- Sem race conditions: requisições obsoletas são descartadas automaticamente
+
+### 📲 PWA (Progressive Web App)
+
+- **Instalável no desktop** (Chrome/Edge: ícone "Instalar" na barra de endereço)
+- Cache automático de assets e fontes para abertura rápida
+- Manifest com ícone mascarável e tema Minerva
 
 ---
 
@@ -134,10 +167,13 @@ Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coor
 | **TypeScript** | 5.5.3 | Superset JavaScript com tipagem estática |
 | **Vite** | 5.4.8 | Build tool e dev server ultrarrápido |
 | **TailwindCSS** | 3.4.1 | Framework CSS utilitário |
-| **Recharts** | 3.7.0 | Biblioteca de gráficos para React |
-| **Lucide React** | 0.344.0 | Biblioteca de ícones moderna |
-| **ExcelJS** | 4.4.0 | Geração de arquivos Excel |
+| **TanStack Query** | 5.59 | Cache, dedup e refetch das chamadas ao GLPI |
+| **Zod** | 3.23 | Validação runtime das respostas da API |
+| **Recharts** | 3.7 | Biblioteca de gráficos para React |
+| **Lucide React** | 0.344 | Biblioteca de ícones moderna |
+| **ExcelJS** | 4.4 | Geração de arquivos Excel (lazy load) |
 | **FileSaver** | 2.0.5 | Download de arquivos no navegador |
+| **vite-plugin-pwa** | 0.20 | Service worker + manifest PWA |
 
 ### Desenvolvimento
 
@@ -152,48 +188,73 @@ Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coor
 ## 📁 Estrutura do Projeto
 
 ```
-minerva-project-main/
+central-monitoramento-chamados-rpa/
 │
 ├── 📄 index.html              # HTML principal
 ├── 📄 package.json            # Dependências e scripts
-├── 📄 vite.config.ts          # Configuração do Vite (inclui proxy GLPI)
-├── 📄 tailwind.config.js      # Configuração do TailwindCSS
-├── 📄 tsconfig.json           # Configuração TypeScript
+├── 📄 vite.config.ts          # Vite + proxy GLPI + PWA
+├── 📄 tailwind.config.js      # TailwindCSS
+├── 📄 tsconfig.json           # TypeScript
 ├── 📄 .env.example            # Exemplo de variáveis de ambiente
 │
-├── 📂 public/                 # Arquivos estáticos
-│   └── 📄 favicon.png         # Ícone da aplicação
+├── 📂 public/
+│   ├── 📄 favicon.png
+│   └── 📂 icons/
+│       └── 📄 icon.svg        # Ícone PWA mascarável
 │
 └── 📂 src/
     │
-    ├── 📄 main.tsx            # Entry point da aplicação
-    ├── 📄 App.tsx             # Componente raiz (com ThemeProvider)
+    ├── 📄 main.tsx            # Entry point: QueryClientProvider + ErrorBoundary + Toaster
+    ├── 📄 App.tsx             # Wrap com ThemeProvider
+    ├── 📄 config.ts           # Configuração tipada (env vars centralizadas)
     ├── 📄 index.css           # Estilos globais e variáveis CSS
-    ├── 📄 vite-env.d.ts       # Tipos do Vite
     │
-    ├── 📂 components/         # Componentes React
-    │   ├── 📄 Dashboard.tsx           # Dashboard principal
-    │   ├── 📄 TicketFilterPanel.tsx   # Painel de filtros
-    │   ├── 📄 TicketKPICard.tsx       # Card de KPI
-    │   ├── 📄 TicketTable.tsx         # Tabela de chamados
-    │   ├── 📄 StatusChart.tsx         # Gráfico de status
-    │   ├── 📄 TechnicianChart.tsx     # Gráfico de técnicos
-    │   └── 📄 TimelineChart.tsx       # Gráfico de evolução
+    ├── 📂 components/
+    │   ├── 📄 Dashboard.tsx              # Orquestrador
+    │   ├── 📄 DashboardHeader.tsx        # Cabeçalho + multi-grupo + ações
+    │   ├── 📄 KPICard.tsx · KPIGrid.tsx  # Cards e grid de KPIs com deltas
+    │   ├── 📄 TimelineChart.tsx          # Evolução + forecast 7 dias
+    │   ├── 📄 PlannedVsRealizedChart.tsx # Planejado vs Realizado
+    │   ├── 📄 StatusChart.tsx            # Status com drill-down
+    │   ├── 📄 TechnicianChart.tsx        # Técnicos com drill-down
+    │   ├── 📄 Heatmap.tsx                # Mapa de calor dia × hora
+    │   ├── 📄 TicketTable.tsx            # Tabela com ordenação + badge "parado há Xd"
+    │   ├── 📄 TicketDetailPanel.tsx      # Painel lateral
+    │   ├── 📄 TicketFilterPanel.tsx      # Filtros (período/status/prio/técnico)
+    │   ├── 📄 PresetsBar.tsx             # Salvar/aplicar presets
+    │   ├── 📄 PresentationCarousel.tsx   # Modo TV (slideshow)
+    │   ├── 📄 ErrorBoundary.tsx          # Fallback de crash global
+    │   └── 📄 Toaster.tsx                # Toasts de feedback
     │
-    ├── 📂 contexts/           # Contextos React
-    │   └── 📄 ThemeContext.tsx        # Contexto de tema claro/escuro
+    ├── 📂 hooks/
+    │   ├── 📄 useGLPITickets.ts          # TanStack Query (tickets + horas)
+    │   ├── 📄 useDashboardFilters.ts     # Filtros + URL + presets + multi-grupo
+    │   ├── 📄 usePresentationMode.ts     # Fullscreen + atalhos + modo TV
+    │   ├── 📄 useTimeAgo.ts              # "há X minutos"
+    │   ├── 📄 useDrillDown.ts            # Cliques nos gráficos
+    │   └── 📄 useToasts.ts               # Sistema de toasts
     │
-    ├── 📂 services/           # Serviços e integrações
-    │   ├── 📄 glpiApi.ts              # Integração com API GLPI
-    │   ├── 📄 analytics.ts            # Funções de agregação e métricas
-    │   ├── 📄 excelExport.ts          # Exportação para Excel
-    │   └── 📄 minervaApi.ts           # API Minerva (legacy)
+    ├── 📂 contexts/
+    │   ├── 📄 ThemeContext.tsx           # Provider claro/escuro
+    │   └── 📄 useTheme.ts                # Hook do contexto
     │
-    ├── 📂 types/              # Definições de tipos TypeScript
-    │   └── 📄 index.ts                # Interfaces e types
+    ├── 📂 services/
+    │   ├── 📄 analytics.ts               # Agregações, métricas, chamados parados, forecast, deltas, heatmap
+    │   ├── 📄 excelExport.ts             # Exportação Excel (lazy)
+    │   └── 📂 glpi/                      # Cliente GLPI modular
+    │       ├── 📄 index.ts               # Barrel
+    │       ├── 📄 session.ts             # initSession / glpiFetch
+    │       ├── 📄 users.ts               # Usuários + allowlist colaboradores
+    │       ├── 📄 tickets.ts             # Search Tickets
+    │       ├── 📄 tasks.ts               # TicketTask (apontamentos)
+    │       ├── 📄 constants.ts           # FIELDS, STATUS_MAP, PRIORITY_MAP
+    │       └── 📄 schemas.ts             # Validação Zod
     │
-    └── 📂 lib/                # Bibliotecas auxiliares
-        └── 📄 supabase.ts             # Cliente Supabase (não utilizado)
+    ├── 📂 types/
+    │   └── 📄 index.ts                   # Ticket, FilterState, etc.
+    │
+    └── 📂 utils/
+        └── 📄 timeFormat.ts              # formatHoursMinutes
 ```
 
 ---
@@ -235,26 +296,37 @@ Edite o arquivo `.env` com suas credenciais (veja seção abaixo).
 
 ## 🔐 Variáveis de Ambiente
 
-Crie um arquivo `.env` na raiz do projeto:
+Crie um arquivo `.env` na raiz do projeto (use `.env.example` como base):
 
 ```env
-# Token de autenticação Basic (base64)
-VITE_GLPI_AUTH_BASIC=seu_token_basic_aqui
+# Credenciais GLPI
+VITE_GLPI_AUTH_BASIC=seu_token_basic_base64
+VITE_GLPI_APP_TOKEN=seu_app_token
+VITE_GLPI_ENTITY_ID=108
 
-# App Token gerado no GLPI
-VITE_GLPI_APP_TOKEN=seu_app_token_aqui
+# Colaboradores RPA (separados por |, aliases por ,)
+VITE_RPA_COLLABORATORS=Nome Sobrenome|Outro Nome,Variante Do Nome
 
-# ID do grupo técnico (ex: 108 = RPA)
-VITE_GLPI_ENTITY_ID=seu_id_aqui
+# Quantos dias um chamado em aberto precisa ficar parado para virar
+# "Chamado Parado" no KPI/tabela. Padrão: 7.
+VITE_STALE_DAYS=7
+
+# Multi-grupo: id:nome|id:nome (primeiro = padrão)
+VITE_GLPI_GROUPS=108:RPA|110:Infra
 ```
 
 | Variável | Descrição |
 |----------|-----------|
 | `VITE_GLPI_AUTH_BASIC` | Token de autenticação em Base64 para criar sessão |
 | `VITE_GLPI_APP_TOKEN` | Token da aplicação registrada no GLPI |
-| `VITE_GLPI_ENTITY_ID` | ID do grupo/entidade para filtrar chamados |
+| `VITE_GLPI_ENTITY_ID` | ID do grupo padrão (ex: 108 = RPA) |
+| `VITE_RPA_COLLABORATORS` | Allowlist de colaboradores cujas tasks são contabilizadas |
+| `VITE_STALE_DAYS` | Limite (em dias) para classificar um chamado em aberto como "parado" (padrão `7`) |
+| `VITE_GLPI_GROUPS` | Lista de grupos disponíveis no seletor multi-grupo |
 
 > ⚠️ **Importante**: Nunca commite o arquivo `.env` no repositório!
+>
+> 🔐 **Segurança**: como variáveis `VITE_*` são embutidas no bundle, qualquer usuário com acesso ao site público lê suas credenciais GLPI. Em produção exposta externamente, considere um backend proxy que mantenha as credenciais server-side.
 
 ---
 

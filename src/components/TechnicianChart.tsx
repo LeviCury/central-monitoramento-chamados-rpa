@@ -1,9 +1,11 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
 
 interface TechnicianChartProps {
   data: { technician: string; count: number }[];
+  onSelectTechnician?: (technician: string) => void;
+  selectedTechnicians?: string[];
 }
 
 function truncateName(name: string, maxLength: number = 18): string {
@@ -57,9 +59,14 @@ const COLORS_DARK = [
   '#c084fc', // Light Purple
 ];
 
-export default function TechnicianChart({ data }: TechnicianChartProps) {
+export default function TechnicianChart({
+  data,
+  onSelectTechnician,
+  selectedTechnicians,
+}: TechnicianChartProps) {
   const { isDark } = useTheme();
-  
+  const selectedSet = new Set(selectedTechnicians ?? []);
+
   const displayData = data
     .filter(d => d.technician && d.technician !== 'null' && d.technician !== '')
     .slice(0, 10)
@@ -138,14 +145,37 @@ export default function TechnicianChart({ data }: TechnicianChartProps) {
             labelFormatter={() => ''}
             cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(29, 46, 64, 0.05)' }}
           />
-          <Bar dataKey="count" radius={[0, 8, 8, 0]}>
-            {displayData.map((_, index) => {
+          <Bar
+            dataKey="count"
+            radius={[0, 8, 8, 0]}
+            onClick={(payload) => {
+              const tech = (payload as { fullName?: string }).fullName;
+              if (tech && onSelectTechnician) onSelectTechnician(tech);
+            }}
+            cursor={onSelectTechnician ? 'pointer' : 'default'}
+          >
+            {displayData.map((entry, index) => {
               const colors = isDark ? COLORS_DARK : COLORS_LIGHT;
-              return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+              const isSelected = selectedSet.has(entry.fullName);
+              const isDimmed = selectedSet.size > 0 && !isSelected;
+              return (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colors[index % colors.length]}
+                  fillOpacity={isDimmed ? 0.35 : 1}
+                  stroke={isSelected ? '#F84454' : 'none'}
+                  strokeWidth={isSelected ? 2 : 0}
+                />
+              );
             })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
+      {onSelectTechnician && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+          Dica: clique em uma barra para filtrar.
+        </p>
+      )}
     </div>
   );
 }

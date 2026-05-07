@@ -1,9 +1,11 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { PieChart } from 'lucide-react';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme } from '../contexts/useTheme';
 
 interface StatusChartProps {
   data: { status: string; count: number }[];
+  onSelectStatus?: (status: string) => void;
+  selectedStatuses?: string[];
 }
 
 // Cores com a paleta Minerva - Light Mode
@@ -40,8 +42,9 @@ function formatStatus(status: string): string {
   return abbreviations[status] || status;
 }
 
-export default function StatusChart({ data }: StatusChartProps) {
+export default function StatusChart({ data, onSelectStatus, selectedStatuses }: StatusChartProps) {
   const { isDark } = useTheme();
+  const selectedSet = new Set(selectedStatuses ?? []);
   
   const statusColors = isDark ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT;
   const defaultColor = isDark ? DEFAULT_COLOR_DARK : DEFAULT_COLOR_LIGHT;
@@ -118,27 +121,67 @@ export default function StatusChart({ data }: StatusChartProps) {
             labelFormatter={() => ''}
             cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(29, 46, 64, 0.05)' }}
           />
-          <Bar dataKey="count" radius={[8, 8, 0, 0]}>
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
+          <Bar
+            dataKey="count"
+            radius={[8, 8, 0, 0]}
+            onClick={(payload) => {
+              const status = (payload as { status?: string }).status;
+              if (status && onSelectStatus) onSelectStatus(status);
+            }}
+            cursor={onSelectStatus ? 'pointer' : 'default'}
+          >
+            {chartData.map((entry, index) => {
+              const isSelected = selectedSet.has(entry.status);
+              const isDimmed = selectedSet.size > 0 && !isSelected;
+              return (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.color}
+                  fillOpacity={isDimmed ? 0.35 : 1}
+                  stroke={isSelected ? '#F84454' : 'none'}
+                  strokeWidth={isSelected ? 2 : 0}
+                />
+              );
+            })}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
       
-      {/* Legenda */}
-      <div className="flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
-        {chartData.map((item, index) => (
-          <div key={index} className="flex items-center gap-2 text-xs">
-            <div 
-              className="w-3 h-3 rounded-full" 
-              style={{ backgroundColor: item.color }}
-            />
-            <span className="text-gray-600 dark:text-gray-400">{item.status}</span>
-            <span className="font-semibold text-minerva-navy dark:text-white">({item.count})</span>
-          </div>
-        ))}
+      {/* Legenda clicável (drill-down) */}
+      <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
+        {chartData.map((item, index) => {
+          const isSelected = selectedSet.has(item.status);
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => onSelectStatus?.(item.status)}
+              disabled={!onSelectStatus}
+              aria-pressed={isSelected}
+              className={`flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-full transition-all ${
+                isSelected
+                  ? 'bg-minerva-navy text-white'
+                  : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300'
+              } ${!onSelectStatus ? 'cursor-default' : 'cursor-pointer'}`}
+            >
+              <span
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: item.color }}
+                aria-hidden
+              />
+              <span>{item.status}</span>
+              <span className={`font-semibold ${isSelected ? 'text-white' : 'text-minerva-navy dark:text-white'}`}>
+                ({item.count})
+              </span>
+            </button>
+          );
+        })}
       </div>
+      {onSelectStatus && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+          Dica: clique em um status para filtrar.
+        </p>
+      )}
     </div>
   );
 }
