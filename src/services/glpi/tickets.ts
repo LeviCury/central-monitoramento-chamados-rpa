@@ -35,38 +35,51 @@ export interface GLPISearchParams {
 }
 
 /**
- * Pega de canto a configuracao classica errada de mandar o mesmo ID em
- * VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID — geralmente o user pensou
- * que "108" era a entidade quando na verdade e o grupo tecnico, e o
- * GLPI devolve 0 chamados sem erro nenhum (a entidade simplesmente
- * nao existe). Loga uma vez por sessao no console.
+ * Heuristica de seguranca: na Minerva, `108` e o ID do GRUPO tecnico
+ * (RPA), nao da entidade. Quando alguem cola `108` tambem em
+ * VITE_GLPI_ENTITY_ID, o GLPI procura tickets em uma entidade
+ * inexistente e devolve 0 chamados sem erro.
+ *
+ * Em vez de obrigar o user a corrigir a env var no Vercel, o app
+ * detecta a colisao e simplesmente DESCARTA o filtro de entidade,
+ * deixando apenas o filtro por grupo — que e o que funciona. Isso
+ * e seguro porque filtrar so por grupo e mais restritivo que
+ * filtrar por (entidade=108 AND grupo=108).
+ *
+ * Loga 1 vez por sessao no console explicando o que foi feito.
  */
 let warnedAboutDuplicatedId = false;
-function warnIfEntityEqualsGroup(entityValue: string | null, groupValue: string | null) {
-  if (warnedAboutDuplicatedId) return;
-  if (!entityValue || !groupValue) return;
-  if (entityValue !== groupValue) return;
-  warnedAboutDuplicatedId = true;
-  console.warn(
-    `[GLPI] VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID estao com o mesmo valor (${entityValue}). ` +
-      'Isso quase sempre e bug de configuracao: 108 e o ID do GRUPO tecnico, nao da entidade. ' +
-      'Se voce esta vendo "0 chamados" sem erro, deixe VITE_GLPI_ENTITY_ID vazio (apenas grupo basta). ' +
-      'Veja docs/INFRA-CORS.md / .env.example.'
-  );
+function resolveEntityValue(
+  entityValueRaw: string | null,
+  groupValue: string | null
+): string | null {
+  if (!entityValueRaw) return null;
+  if (entityValueRaw && groupValue && entityValueRaw === groupValue) {
+    if (!warnedAboutDuplicatedId) {
+      warnedAboutDuplicatedId = true;
+      console.warn(
+        `[GLPI] VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID estao com o mesmo valor (${entityValueRaw}). ` +
+          'Provavel bug de configuraçao: na Minerva, 108 e o ID do GRUPO tecnico, nao da entidade. ' +
+          'O app esta IGNORANDO o filtro de entidade automaticamente (so o grupo basta). ' +
+          'Para silenciar este aviso, deixe VITE_GLPI_ENTITY_ID vazio nas variaveis do Vercel/.env.'
+      );
+    }
+    return null;
+  }
+  return entityValueRaw;
 }
 
 function buildSearchCriteria(params: GLPISearchParams): object[] {
   const criteria: object[] = [];
 
-  // Sempre filtrar por entidade (campo 80). Isso impede que tickets
-  // de outras unidades organizacionais entrem no resultado.
-  // Usamos `under` (não `equals`): a entidade configurada e suas filhas.
-  // No GLPI, `equals` em entity costuma exigir o ID interno em vez do nome,
-  // e algumas instalações ignoram o critério silenciosamente.
-  const entityValue = params.entityId || config.glpi.entityId;
+  const entityValueRaw = params.entityId || config.glpi.entityId;
   const groupValue = params.groupId || config.glpi.defaultGroupId;
-  warnIfEntityEqualsGroup(entityValue, groupValue);
+  const entityValue = resolveEntityValue(entityValueRaw, groupValue);
 
+  // Filtro por entidade (campo 80). Usamos `under` (não `equals`): a
+  // entidade configurada e suas filhas. Em algumas instalações do GLPI
+  // o `equals` em entity exige o ID interno em vez do nome, e o critério
+  // é ignorado silenciosamente.
   if (entityValue) {
     criteria.push({
       link: 'AND',

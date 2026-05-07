@@ -711,29 +711,21 @@ O filtro de fila não está casando — o GLPI está devolvendo o universo até 
 <summary><b>Em produção (Vercel) o painel mostra "0 chamados" mas SEM erro nenhum no console</b></summary>
 <br/>
 
-**Causa #1 (95% dos casos): você setou `VITE_GLPI_ENTITY_ID` igual ao `VITE_GLPI_GROUP_ID`.**
+**Causa #1 (95% dos casos): `VITE_GLPI_ENTITY_ID` está com o mesmo valor do `VITE_GLPI_GROUP_ID`.**
 
-`108` na Minerva é o ID do **grupo técnico** (RPA), não de uma entidade. Quando você coloca `108` em ambos, o GLPI procura tickets em uma entidade que não existe e devolve 0 chamados — sem erro, porque tecnicamente a busca foi um sucesso.
+Na Minerva, `108` é o ID do **grupo técnico** (RPA), não de uma entidade. Se a sua build foi feita com **versão anterior do código**, o GLPI está procurando tickets em uma entidade inexistente e devolvendo 0 chamados sem erro.
 
-**Como confirmar:** abra o DevTools → Console no Vercel. Se aparecer:
+**A partir da versão `e3da215+` o app se defende sozinho**: detecta a colisão `entityId == groupId`, **ignora o filtro de entidade automaticamente** e segue só com o grupo (que é o que funciona). Você verá no console:
 
 ```
-[GLPI] Buscando tickets com critérios: {"criteria":[
-  {"link":"AND","field":80,"searchtype":"under","value":"108"},
-  {"link":"AND","field":8,"searchtype":"under","value":"108"},
-  ...
-]}
-[GLPI] Sessão criada com sucesso
+[GLPI] VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID estao com o mesmo valor (108).
+       Provavel bug de configuraçao: na Minerva, 108 e o ID do GRUPO tecnico, nao da entidade.
+       O app esta IGNORANDO o filtro de entidade automaticamente (so o grupo basta).
 ```
 
-…credenciais e CORS estão ok, e os dois `value:"108"` em `field:80` (entidade) e `field:8` (grupo) confirmam o problema. A versão atual do app também imprime um `console.warn` explícito quando detecta isso.
+E o critério passa a vir limpo, sem `field:80`. Os tickets aparecem.
 
-**Fix em 30s:**
-
-1. Vercel → projeto → *Settings → Environment Variables*.
-2. Edite `VITE_GLPI_ENTITY_ID` e deixe **vazio** (ou apague a variável).
-3. *Deployments* → último deploy → `...` → **Redeploy** (env var só aplica em build novo).
-4. Recarregue a página. Os tickets aparecem.
+**Se quiser silenciar o warning** (cosmético): no Vercel, *Settings → Environment Variables*, apague `VITE_GLPI_ENTITY_ID` ou deixe o valor em branco. Depois *Deployments → ... → Redeploy*.
 
 </details>
 
