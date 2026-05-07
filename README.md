@@ -415,11 +415,11 @@ VITE_GLPI_APP_TOKEN=seu_app_token_aqui
 VITE_GLPI_ENTITY_ID=
 
 # Grupo técnico GLPI (campo 8). É o ID do "RPA" no GLPI.
-VITE_GLPI_GROUP_ID=108
+VITE_GLPI_GROUP_ID= ID_DO_GRUPO
 
 # Lista de grupos disponíveis no seletor multi-grupo (id:nome|id:nome).
 # O primeiro é o padrão.
-VITE_GLPI_GROUPS=108:RPA
+VITE_GLPI_GROUPS= ID_DO_GRUPO :RPA
 
 # === Equipe RPA ===
 # Apontamentos só são contabilizados se o autor estiver nesta lista.
@@ -435,7 +435,7 @@ VITE_STALE_DAYS=7
 | ------------------------- | :---------: | --------------------------------------------------------------------------------------------------------------- |
 | `VITE_GLPI_AUTH_BASIC`    |     Sim     | Token Basic em Base64 (`base64(usuario:senha)`) para criar sessão no GLPI                                        |
 | `VITE_GLPI_APP_TOKEN`     |     Sim     | App-Token gerado em *GLPI → Configurar → Geral → API*                                                            |
-| `VITE_GLPI_GROUP_ID`      |     Não     | ID do grupo técnico (campo 8). Padrão `108` (RPA). Use `under` no GLPI: pega o grupo e seus subgrupos             |
+| `VITE_GLPI_GROUP_ID`      |     Não     | ID do grupo técnico (campo 8). Padrão `ID_DO_GRUPO` (RPA). Use `under` no GLPI: pega o grupo e seus subgrupos             |
 | `VITE_GLPI_ENTITY_ID`     |     Não     | ID da entidade (campo 80). Vazio = não filtrar por entidade. Útil quando o GLPI separa por unidade organizacional|
 | `VITE_GLPI_GROUPS`        |     Não     | `id:nome|id:nome|...` para o seletor multi-grupo. O primeiro vira default                                        |
 | `VITE_RPA_COLLABORATORS`  |     Não     | Allowlist de colaboradores cujas tasks são contabilizadas. Aliases por vírgula                                   |
@@ -493,10 +493,10 @@ A sessão é cacheada em memória e renovada automaticamente em respostas `401`.
 {
   criteria: [
     // (opcional) entidade — campo 80
-    { link: 'AND', field: 80, searchtype: 'under', value: '108' },
+    { link: 'AND', field: 80, searchtype: 'under', value: 'ID_DO_GRUPO' },
 
     // grupo técnico — campo 8 — usar `under` em vez de `equals`
-    { link: 'AND', field: 8,  searchtype: 'under', value: '108' },
+    { link: 'AND', field: 8,  searchtype: 'under', value: 'ID_DO_GRUPO' },
 
     // datas, status, prioridade...
   ]
