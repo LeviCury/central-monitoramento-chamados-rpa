@@ -12,6 +12,8 @@ export const GLPI_FIELDS = {
   PRIORITY: 3,
   URGENCY: 10,
   IMPACT: 11,
+  /** 14 = type (1 = Incidente, 2 = Requisição) */
+  TYPE: 14,
   REQUESTER: 4,
   TECHNICIAN: 5,
   TECHNICIAN_GROUP: 8,
@@ -23,6 +25,11 @@ export const GLPI_FIELDS = {
   TIME_TO_RESOLVE: 30,
   SOLVE_DELAY: 155,
 } as const;
+
+export const TYPE_MAP: Record<number, string> = {
+  1: 'Incidente',
+  2: 'Requisição',
+};
 
 export const STATUS_MAP: Record<number, string> = {
   1: 'Novo',

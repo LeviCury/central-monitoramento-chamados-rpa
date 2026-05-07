@@ -15,6 +15,7 @@ import {
   Insight,
   MetricsDelta,
   TicketMetrics,
+  TypeBreakdown,
 } from './analytics';
 import { saveAs } from 'file-saver';
 
@@ -381,11 +382,85 @@ function drawSectionTitle(pdf: jsPDF, y: number, label: string, accent: RGB = BR
 interface KpiCard {
   title: string;
   value: string;
-  subtitle: string;
+  /** Subtítulo de 1 linha (modo simples). Ignorado se `subtitleLines` for fornecido. */
+  subtitle?: string;
+  /** Subtítulo multilinha didático. Cada item é uma linha (até 3-4). */
+  subtitleLines?: Array<{ value: string; label: string; hint?: string }>;
+  /** Mini-pílulas Inc/Req embutidas no rodapé do card. */
+  typeBreakdown?: TypeBreakdown;
   color: RGB;
   delta?: number | null;
   /** Quando true, subir é ruim (ex.: chamados parados, em aberto). */
   deltaInverse?: boolean;
+}
+
+/**
+ * Constrói o texto do delta usando caracteres ASCII-safe.
+ * NÃO usar `▲` ou `▼` aqui — Helvetica embutido no jsPDF não tem esses
+ * glifos e renderiza lixo ("%²", "%¼"). Cor + sinal `+`/`−`/`±` é o suficiente.
+ */
+function formatDeltaText(delta: number): { sign: string; text: string } {
+  if (delta === 0) return { sign: '+/-', text: '0%' };
+  // Ascii-safe: + e - (U+002D), suportados em qualquer fonte embutida no jsPDF.
+  const sign = delta > 0 ? '+' : '-';
+  return {
+    sign,
+    text: `${sign}${Math.abs(delta).toFixed(Math.abs(delta) % 1 === 0 ? 0 : 1)}%`,
+  };
+}
+
+function drawDeltaBadge(
+  pdf: jsPDF,
+  x: number,
+  y: number,
+  delta: number,
+  inverse = false
+): { width: number; height: number } {
+  const isUp = delta > 0;
+  const isFlat = delta === 0;
+  const isGood = isFlat ? null : inverse ? !isUp : isUp;
+  const badgeColor: RGB = isFlat ? BRAND.slate : isGood ? BRAND.green : BRAND.red;
+  const { text } = formatDeltaText(delta);
+
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7);
+  const textW = pdf.getTextWidth(text);
+  const padX = 2.4;
+  const badgeW = textW + padX * 2;
+  const badgeH = 4.6;
+
+  setFill(pdf, badgeColor);
+  pdf.roundedRect(x, y, badgeW, badgeH, 1.2, 1.2, 'F');
+  setColor(pdf, BRAND.white);
+  pdf.text(text, x + badgeW / 2, y + 3.3, { align: 'center' });
+
+  return { width: badgeW, height: badgeH };
+}
+
+function drawTypePillsInline(
+  pdf: jsPDF,
+  x: number,
+  y: number,
+  bd: TypeBreakdown
+): void {
+  const items: Array<{ label: string; color: RGB }> = [
+    { label: `Inc ${bd.incident}`, color: BRAND.red },
+    { label: `Req ${bd.request}`, color: BRAND.blue },
+  ];
+  if (bd.unknown > 0) items.push({ label: `? ${bd.unknown}`, color: BRAND.slate });
+
+  let cursor = x;
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.8);
+  for (const item of items) {
+    const w = pdf.getTextWidth(item.label) + 4.5;
+    const h = 3.6;
+    setFill(pdf, item.color);
+    pdf.roundedRect(cursor, y, w, h, h / 2, h / 2, 'F');
+    setColor(pdf, BRAND.white);
+    pdf.text(item.label, cursor + w / 2, y + 2.55, { align: 'center' });
+    cursor += w + 1.5;
+  }
 }
 
 function drawKpiCard(
@@ -396,60 +471,77 @@ function drawKpiCard(
   h: number,
   c: KpiCard
 ): void {
-  // Fundo creme
   setFill(pdf, BRAND.cream);
   pdf.roundedRect(x, y, w, h, 2, 2, 'F');
 
-  // Borda lateral colorida
   setFill(pdf, c.color);
   pdf.roundedRect(x, y, 2.5, h, 1.2, 1.2, 'F');
 
-  // Título
+  const innerLeft = x + 7;
+  const innerRight = x + w - 4;
+
   setColor(pdf, BRAND.muted);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7);
-  pdf.text(c.title.toUpperCase(), x + 6, y + 6);
+  pdf.setFontSize(6.8);
+  pdf.text(c.title.toUpperCase(), innerLeft, y + 5.6);
 
-  // Valor (gigante)
+  // Valor: tamanho dinâmico em função do tamanho do texto
   setColor(pdf, BRAND.navy);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(20);
-  pdf.text(c.value, x + 6, y + 17);
+  const valueFont = c.value.length > 7 ? 16 : c.value.length > 5 ? 18 : 20;
+  pdf.setFontSize(valueFont);
+  pdf.text(c.value, innerLeft, y + 16);
+
+  // Delta badge (canto superior direito)
+  if (c.delta !== undefined && c.delta !== null && Number.isFinite(c.delta)) {
+    const { text } = formatDeltaText(c.delta);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7);
+    const textW = pdf.getTextWidth(text);
+    const badgeW = textW + 4.8;
+    drawDeltaBadge(pdf, innerRight - badgeW, y + 3, c.delta, c.deltaInverse);
+  }
 
   // Subtítulo
   setColor(pdf, BRAND.muted);
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(7.5);
-  const subLines = pdf.splitTextToSize(c.subtitle, w - 10);
-  pdf.text(subLines, x + 6, y + h - 4.5);
+  if (c.subtitleLines && c.subtitleLines.length > 0) {
+    let subY = y + 22;
+    pdf.setFontSize(7.5);
+    for (const line of c.subtitleLines) {
+      // valor em negrito navy + label em muted + hint em itálico mais clarinho
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      setColor(pdf, BRAND.navy);
+      const valueText = String(line.value);
+      pdf.text(valueText, innerLeft, subY);
+      const valueW = pdf.getTextWidth(valueText);
 
-  // Delta badge (canto superior direito)
-  if (c.delta !== undefined && c.delta !== null && Number.isFinite(c.delta)) {
-    const isUp = c.delta > 0;
-    const isFlat = c.delta === 0;
-    // bom subindo? se inverse=true, subir é ruim
-    const isGood = isFlat ? null : c.deltaInverse ? !isUp : isUp;
-    const badgeColor: RGB = isFlat
-      ? BRAND.slate
-      : isGood
-        ? BRAND.green
-        : BRAND.red;
-    const arrow = isFlat ? '–' : isUp ? '▲' : '▼';
-    const text = `${arrow} ${Math.abs(c.delta)}%`;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(7);
+      setColor(pdf, BRAND.text);
+      pdf.text(' ' + line.label, innerLeft + valueW, subY);
 
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7);
-    const textW = pdf.getTextWidth(text);
-    const padX = 2.5;
-    const badgeW = textW + padX * 2;
-    const badgeH = 5;
-    const badgeX = x + w - 4 - badgeW;
-    const badgeY = y + 3;
+      if (line.hint) {
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(6.5);
+        setColor(pdf, BRAND.muted);
+        const hintLines = pdf.splitTextToSize(line.hint, w - 10);
+        pdf.text(hintLines[0], innerLeft, subY + 3);
+        subY += 7;
+      } else {
+        subY += 4.5;
+      }
+    }
+  } else if (c.subtitle) {
+    pdf.setFontSize(7.5);
+    const subLines = pdf.splitTextToSize(c.subtitle, w - 10);
+    pdf.text(subLines, innerLeft, y + 22);
+  }
 
-    setFill(pdf, badgeColor);
-    pdf.roundedRect(badgeX, badgeY, badgeW, badgeH, 1.2, 1.2, 'F');
-    setColor(pdf, BRAND.white);
-    pdf.text(text, badgeX + badgeW / 2, badgeY + 3.6, { align: 'center' });
+  // Mini-pílulas Inc/Req no rodapé
+  if (c.typeBreakdown) {
+    drawTypePillsInline(pdf, innerLeft, y + h - 4.5, c.typeBreakdown);
   }
 }
 
@@ -535,16 +627,72 @@ function drawHeroBlock(
   // Delta de total no canto sup. esq. (se houver)
   if (delta?.deltas.total != null && Number.isFinite(delta.deltas.total)) {
     const d = delta.deltas.total;
-    const isUp = d > 0;
-    const arrow = d === 0 ? '–' : isUp ? '▲' : '▼';
-    const txt = `${arrow} ${Math.abs(d)}% vs período anterior`;
-    setColor(pdf, isUp ? BRAND.green : d === 0 ? BRAND.slate : BRAND.red);
+    const { text } = formatDeltaText(d);
+    const txt = `${text} vs período anterior`;
+    setColor(pdf, d === 0 ? [200, 210, 225] : d > 0 ? [142, 247, 184] : [253, 156, 165]);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(8);
     pdf.text(txt, blockX + 24, blockY + 8);
   }
 
   return blockY + blockH + 6;
+}
+
+/**
+ * Faixa fina cinza-clara explicando o que é a variação % nos KPIs.
+ * Aparece logo abaixo do hero, na primeira página.
+ */
+function drawDidacticLegend(pdf: jsPDF, y: number): number {
+  const x = PAGE.margin;
+  const w = PAGE.w - PAGE.margin * 2;
+  const h = 13;
+
+  setFill(pdf, [240, 244, 250]);
+  pdf.roundedRect(x, y, w, h, 2, 2, 'F');
+
+  setFill(pdf, BRAND.navy);
+  pdf.roundedRect(x, y, 1.5, h, 0.7, 0.7, 'F');
+
+  setColor(pdf, BRAND.navy);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(7);
+  pdf.text('COMO LER AS %', x + 4, y + 4);
+
+  setColor(pdf, BRAND.text);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.text(
+    'Cada variacao compara o periodo atual com o periodo anterior de mesma duracao.',
+    x + 4,
+    y + 8
+  );
+
+  // mini-legenda colorida na linha de baixo
+  const legY = y + 11.5;
+  // Verde +
+  setFill(pdf, BRAND.green);
+  pdf.roundedRect(x + 4, legY - 2, 5.5, 3, 1, 1, 'F');
+  setColor(pdf, BRAND.white);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.5);
+  pdf.text('+X%', x + 6.75, legY + 0.3, { align: 'center' });
+  setColor(pdf, BRAND.text);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7);
+  pdf.text('subiu (verde = direcao desejada)', x + 11, legY);
+
+  setFill(pdf, BRAND.red);
+  pdf.roundedRect(x + 73, legY - 2, 6.2, 3, 1, 1, 'F');
+  setColor(pdf, BRAND.white);
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(6.5);
+  pdf.text('-X%', x + 76.1, legY + 0.3, { align: 'center' });
+  setColor(pdf, BRAND.text);
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(7);
+  pdf.text('caiu (vermelho = direcao indesejada)', x + 81, legY);
+
+  return y + h + 5;
 }
 
 function drawHorizontalBar(
@@ -630,6 +778,103 @@ function drawStatusBreakdown(
     cursor += rowGap;
   }
   return cursor + 1;
+}
+
+function drawTypeBreakdownSection(
+  pdf: jsPDF,
+  y: number,
+  metrics: TicketMetrics
+): number {
+  const x = PAGE.margin;
+  const w = PAGE.w - PAGE.margin * 2;
+  const colGap = 5;
+  const colW = (w - colGap) / 2;
+  const h = 36;
+
+  const total =
+    metrics.totalByType.incident +
+    metrics.totalByType.request +
+    metrics.totalByType.unknown;
+
+  const blocks = [
+    {
+      label: 'Incidentes',
+      hint: 'Algo quebrou na operação',
+      color: BRAND.red,
+      total: metrics.totalByType.incident,
+      open: metrics.openByType.incident,
+      stale: metrics.staleByType.incident,
+      finalized: metrics.finalizedByType.incident,
+    },
+    {
+      label: 'Requisições',
+      hint: 'Solicitação / melhoria / projeto',
+      color: BRAND.blue,
+      total: metrics.totalByType.request,
+      open: metrics.openByType.request,
+      stale: metrics.staleByType.request,
+      finalized: metrics.finalizedByType.request,
+    },
+  ];
+
+  blocks.forEach((b, idx) => {
+    const cx = x + idx * (colW + colGap);
+    setFill(pdf, BRAND.cream);
+    pdf.roundedRect(cx, y, colW, h, 2, 2, 'F');
+    setFill(pdf, b.color);
+    pdf.roundedRect(cx, y, 2.5, h, 1.2, 1.2, 'F');
+
+    setColor(pdf, BRAND.muted);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(6.8);
+    pdf.text(b.label.toUpperCase(), cx + 6, y + 5);
+
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(7);
+    setColor(pdf, BRAND.muted);
+    pdf.text(b.hint, cx + 6, y + 9);
+
+    setColor(pdf, BRAND.navy);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(20);
+    pdf.text(b.total.toLocaleString('pt-BR'), cx + 6, y + 19);
+
+    const pctOfTotal = total > 0 ? (b.total / total) * 100 : 0;
+    setColor(pdf, BRAND.muted);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    pdf.text(`${pctOfTotal.toFixed(1)}% do total`, cx + 6, y + 23);
+
+    // Métricas linha de baixo
+    const closure = b.total > 0 ? Math.round((b.finalized / b.total) * 100) : 0;
+    const stats = [
+      { label: 'em aberto', value: String(b.open), color: BRAND.amber },
+      { label: 'parados', value: String(b.stale), color: b.stale > 0 ? BRAND.red : BRAND.green },
+      { label: 'taxa resol.', value: `${closure}%`, color: BRAND.green },
+    ];
+
+    const statW = (colW - 12) / stats.length;
+    stats.forEach((s, i) => {
+      const sx = cx + 6 + i * statW;
+      setFill(pdf, [255, 255, 255]);
+      pdf.roundedRect(sx, y + 26, statW - 1, 8, 1.5, 1.5, 'F');
+
+      setFill(pdf, s.color);
+      pdf.circle(sx + 2.5, y + 30, 1, 'F');
+
+      setColor(pdf, BRAND.navy);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8.5);
+      pdf.text(s.value, sx + 5, y + 30.5);
+
+      setColor(pdf, BRAND.muted);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(6.5);
+      pdf.text(s.label, sx + 5, y + 33.5);
+    });
+  });
+
+  return y + h + 4;
 }
 
 function drawTechnicianBreakdown(
@@ -758,9 +1003,12 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   let y = 42;
   y = drawHeroBlock(pdf, y, input.metrics, input.delta);
 
-  // KPIs grid (3 colunas × 2 linhas)
+  // Legenda didática explicando as %
+  y = drawDidacticLegend(pdf, y);
+
+  // KPIs grid (3 colunas × 2 linhas) — altura maior pra acomodar 3 linhas de subtítulo
   const kpiW = (PAGE.w - PAGE.margin * 2 - 4 * 2) / 3;
-  const kpiH = 26;
+  const kpiH = 38;
   const cards = buildKpiCards(input);
 
   for (let i = 0; i < cards.length; i++) {
@@ -770,18 +1018,39 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
     const cy = y + row * (kpiH + 4);
     drawKpiCard(pdf, cx, cy, kpiW, kpiH, cards[i]);
   }
-  y += kpiH * 2 + 4 + 8;
+  y += kpiH * 2 + 4 + 7;
+
+  // Quebra para a próxima página se vai ficar apertado
+  if (y > PAGE.h - 75) {
+    pdf.addPage();
+    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+    y = 22;
+  }
 
   // Distribuição por Status (se vier)
   if (input.statusBreakdown && input.statusBreakdown.length > 0) {
-    y = drawSectionTitle(pdf, y, 'Distribuição por Status', BRAND.red);
+    y = drawSectionTitle(pdf, y, 'Distribuicao por Status', BRAND.red);
     y = drawStatusBreakdown(pdf, y, input.statusBreakdown, input.metrics.total);
     y += 4;
   }
 
+  // Por Tipo de Chamado
+  if (y > PAGE.h - 60) {
+    pdf.addPage();
+    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+    y = 22;
+  }
+  y = drawSectionTitle(pdf, y, 'Por Tipo de Chamado', BRAND.red);
+  y = drawTypeBreakdownSection(pdf, y, input.metrics);
+
   // Top técnicos (se vier)
   if (input.technicianBreakdown && input.technicianBreakdown.length > 0) {
-    y = drawSectionTitle(pdf, y, 'Top 5 Técnicos', BRAND.red);
+    if (y > PAGE.h - 65) {
+      pdf.addPage();
+      drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+      y = 22;
+    }
+    y = drawSectionTitle(pdf, y, 'Top 5 Tecnicos', BRAND.red);
     y = drawTechnicianBreakdown(pdf, y, input.technicianBreakdown);
   }
 
@@ -855,20 +1124,38 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
       title: 'Total de Chamados',
       value: m.total.toLocaleString('pt-BR'),
       subtitle: `${m.inProgress} em atendimento`,
+      typeBreakdown: m.totalByType,
       color: BRAND.navy,
       delta: d?.total ?? null,
     },
     {
       title: 'Taxa de Resolução',
       value: `${m.closureRate}%`,
-      subtitle: `${m.finalized} finalizados`,
+      subtitle: `${m.finalized} finalizados de ${m.total}`,
       color: BRAND.green,
       delta: d?.closureRate ?? null,
     },
     {
       title: 'Em Aberto',
       value: m.open.toLocaleString('pt-BR'),
-      subtitle: `${m.pending} pendentes · ${m.newTickets} novos`,
+      subtitleLines: [
+        {
+          value: String(m.inProgress),
+          label: 'em atendimento',
+          hint: 'na nossa mão',
+        },
+        {
+          value: String(m.pending),
+          label: 'pendentes',
+          hint: 'aguardando externos (cliente / fornecedor)',
+        },
+        {
+          value: String(m.newTickets),
+          label: 'novos',
+          hint: 'ainda nao atribuidos',
+        },
+      ],
+      typeBreakdown: m.openByType,
       color: BRAND.amber,
       delta: d?.open ?? null,
       deltaInverse: true,
@@ -879,13 +1166,14 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
       subtitle:
         m.staleCount === 0
           ? `Nenhum > ${m.staleThresholdDays}d`
-          : `Média ${m.avgDaysOpen.toFixed(1)}d (limite ${m.staleThresholdDays}d)`,
+          : `Media ${m.avgDaysOpen.toFixed(1)}d (limite ${m.staleThresholdDays}d)`,
+      typeBreakdown: m.staleCount > 0 ? m.staleByType : undefined,
       color: m.staleCount > 0 ? BRAND.red : BRAND.green,
       delta: d?.staleCount ?? null,
       deltaInverse: true,
     },
     {
-      title: 'Média de Horas',
+      title: 'Media de Horas',
       value: `${m.avgWorkHours.toFixed(1)}h`,
       subtitle: `${m.totalRealizedHours.toFixed(1)}h realizadas`,
       color: BRAND.blue,

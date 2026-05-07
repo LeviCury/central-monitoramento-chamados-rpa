@@ -7,6 +7,10 @@ export interface KPICardProps {
   title: string;
   value: number | string;
   subtitle?: string;
+  /** Subtítulo customizado (ReactNode) — sobrepõe `subtitle` quando presente. */
+  subtitleNode?: ReactNode;
+  /** Mini-pílulas no rodapé (ex.: Inc 5 · Req 4). */
+  breakdown?: ReactNode;
   icon: ReactNode;
   color?: KPIColor;
   delay?: number;
@@ -81,6 +85,8 @@ export function KPICard({
   title,
   value,
   subtitle,
+  subtitleNode,
+  breakdown,
   icon,
   color = 'navy',
   delay = 0,
@@ -99,7 +105,7 @@ export function KPICard({
 
   return (
     <div
-      className={`${styles.bg} rounded-2xl ${large ? 'p-8' : 'p-5'} shadow-minerva-lg card-hover animate-fade-in transition-all text-white`}
+      className={`${styles.bg} rounded-2xl ${large ? 'p-8' : 'p-5'} shadow-minerva-lg card-hover animate-fade-in transition-all text-white flex flex-col`}
       style={{ animationDelay: `${delay * 0.1}s` }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -112,10 +118,14 @@ export function KPICard({
               {typeof value === 'number' ? value.toLocaleString('pt-BR') : value}
             </p>
           )}
-          {subtitle && (
-            <p className={`${subtitleClass} ${styles.subtext} mt-2 truncate`} title={subtitle}>
-              {subtitle}
-            </p>
+          {subtitleNode ? (
+            <div className="mt-2">{subtitleNode}</div>
+          ) : (
+            subtitle && (
+              <p className={`${subtitleClass} ${styles.subtext} mt-2 truncate`} title={subtitle}>
+                {subtitle}
+              </p>
+            )
           )}
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
@@ -125,6 +135,11 @@ export function KPICard({
           )}
         </div>
       </div>
+      {breakdown && (
+        <div className="mt-3 pt-3 border-t border-white/15 flex flex-wrap gap-1.5">
+          {breakdown}
+        </div>
+      )}
     </div>
   );
 }

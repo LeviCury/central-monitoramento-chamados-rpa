@@ -70,9 +70,9 @@ Painel web que substitui planilhas e relatórios manuais. Lê tickets do **GLPI*
 <td width="50%" valign="top">
 
 ### Saídas executivas
-- **PDF Resumo Executivo** (1 página, programático)
+- **PDF Resumo Executivo** com legenda didática das %, breakdown por **Tipo** (Incidente / Requisição) e card "Em Aberto" com 3 linhas explicativas
 - **PNG/PDF Snapshot** do dashboard
-- **Excel** com 4 abas (Resumo, Por Técnico, Por Status, Insights & Ações)
+- **Excel** com 6 abas (Resumo, Chamados, Apontamentos, Por Técnico, Por Tipo, Insights & Ações)
 - Copiar imagem para a área de transferência
 
 </td>
@@ -134,17 +134,38 @@ npm run dev               # http://localhost:5173
 
 ### KPIs com comparativo
 
-| KPI                    | O que mede                                                                              |
-| ---------------------- | --------------------------------------------------------------------------------------- |
-| **Total de Chamados**  | Total no período + Δ% vs período anterior equivalente                                   |
-| **Taxa de Resolução**  | (fechados + solucionados) / total + Δ vs período anterior                               |
-| **Chamados em Aberto** | Em atendimento + pendentes + novos + Δ vs período anterior                              |
-| **Chamados Parados**   | Em aberto há mais de `VITE_STALE_DAYS` dias (padrão `7`), com média de dias em aberto   |
-| **Média de Horas**     | Média de horas trabalhadas por chamado **com apontamento**                              |
-| **Saldo de Horas**     | Realizado − Planejado (KPI executivo de capacidade)                                     |
+| KPI                    | O que mede                                                                                                              |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| **Total de Chamados**  | Total no período + Δ% vs período anterior equivalente · mini-pílulas `Inc N · Req N`                                    |
+| **Taxa de Resolução**  | (fechados + solucionados) / total + Δ vs período anterior                                                               |
+| **Chamados em Aberto** | 3 linhas didáticas: `em atendimento` (na nossa mão) · `pendentes` (aguardando externos) · `novos` (não atribuídos)      |
+| **Chamados Parados**   | Em aberto há mais de `VITE_STALE_DAYS` dias (padrão `7`) · subtítulo `Inc N · Req N · Média Xd`                         |
+| **Média de Horas**     | Média de horas trabalhadas por chamado **com apontamento**                                                              |
+| **Saldo de Horas**     | Realizado − Planejado (KPI executivo de capacidade)                                                                     |
 
 > [!NOTE]
-> Quando há filtro de data ativo, **todos** os KPIs mostram comparativo automático com o período anterior de mesma duração. Os deltas são coloridos por sinal e tom (subir/cair pode ser bom ou ruim dependendo do KPI).
+> Quando há filtro de data ativo, **todos** os KPIs mostram comparativo automático com o período anterior de mesma duração. Os deltas são coloridos por sinal e tom (subir/cair pode ser bom ou ruim dependendo do KPI). O sinal aparece como `+X%` ou `-X%` (ASCII puro) — sem setas unicode que poderiam falhar no PDF.
+
+### Mini-glossário dos estados
+
+Esses termos aparecem nos KPIs, nos gráficos e no PDF executivo:
+
+| Estado                      | Significado                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------ |
+| **Em atendimento (atribuído)** | Está com um técnico — **na nossa mão**                                            |
+| **Pendente**                | Aguardando algo **externo** (cliente, fornecedor, outro time)                        |
+| **Novo**                    | Criado mas ainda não foi atribuído a um técnico                                      |
+| **Solucionado / Fechado**   | Finalizado                                                                           |
+| **Parado**                  | Em aberto há mais de `VITE_STALE_DAYS` (padrão `7d`) — independe do estado interno   |
+
+### Tipo de chamado (Incidente x Requisição)
+
+Capturado do campo `14` do GLPI:
+
+- **Incidente** (vermelho): algo quebrou na operação e precisa de correção
+- **Requisição** (azul): solicitação, melhoria ou projeto
+
+Mostrado em todo o dashboard como mini-pílulas, em um donut dedicado e como filtro chip. No PDF executivo aparece como uma seção própria "Por Tipo de Chamado" com taxa de resolução, parados e em aberto por tipo.
 
 ### Insights automáticos e ações sugeridas
 
@@ -160,6 +181,7 @@ Logo abaixo dos KPIs aparece o bloco **"Hoje no RPA"**:
 | **Evolução de Chamados**      | Área diária + projeção dos próximos 7 dias (regressão linear)          |
 | **Planejado x Realizado**     | Barras agrupadas por colaborador RPA                                   |
 | **Distribuição por Status**   | Clique na barra ou legenda para filtrar pelo status                    |
+| **Distribuição por Tipo**     | Donut Incidente x Requisição — clique na fatia para filtrar pelo tipo  |
 | **Chamados por Técnico**      | Ranking horizontal — clique na barra para filtrar pelo técnico         |
 | **Heatmap dia × hora**        | Identifica picos de demanda na semana                                  |
 
@@ -176,9 +198,9 @@ Selecione até 4 técnicos e veja lado a lado:
 ### Filtros avançados
 
 - **Período**: filtros rápidos (Hoje, 7d, 30d, este/último mês) + intervalo manual
-- **Status, Prioridade, Técnico**: seleção múltipla
+- **Status, Prioridade, Técnico, Tipo**: seleção múltipla. O filtro **Tipo** (Incidente/Requisição) é client-side e atualiza KPIs, gráficos e tabela em tempo real
 - **Drill-down** clicando em qualquer gráfico
-- **URL compartilhável**: filtros viram query params (`?start=...&status=Pendente`) — copie o link e mande no Teams
+- **URL compartilhável**: filtros viram query params (`?start=...&status=Pendente&type=incidente`) — copie o link e mande no Teams
 - **Presets**: salva combinações nomeadas no `localStorage`, aplica com 1 clique
 - **Multi-grupo**: seletor no header quando há múltiplos grupos configurados (`VITE_GLPI_GROUPS`)
 
@@ -544,22 +566,19 @@ Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva,
 
 **Página 1 — Visão geral**
 
-- **Header**: ribbon Minerva red 3 mm + bloco navy de 31 mm com:
-  - Eyebrow `MINERVA FOODS · DOCUMENTO INTERNO`
-  - Título "Resumo Executivo" 22 pt
-  - Subtítulo do grupo
-  - Bloco direito com `PERÍODO` e `GERADO EM`
+- **Header**: ribbon Minerva red + bloco navy com eyebrow `MINERVA FOODS · DOCUMENTO INTERNO`, título "Resumo Executivo" e bloco direito com `PERÍODO` e `GERADO EM`
 - **Hero**: bloco navy escuro com:
-  - Total de chamados em 34 pt
-  - Delta `▲ X% vs período anterior`
-  - 3 pílulas (em aberto · finalizados · parados) com dots coloridos
-- **6 KPIs** (3×2) com:
-  - Borda lateral colorida
-  - Title small caps
-  - Valor 20 pt
-  - Subtítulo
-  - **Badge de delta** no canto superior direito (`▲`/`▼` + %), com cor invertida quando subir é ruim (parados, em aberto)
+  - Total de chamados em destaque
+  - Delta vs período anterior (`+X%` em verde / `-X%` em vermelho — **sem setas unicode**, só ASCII puro pra renderizar igual em qualquer fonte)
+  - 3 pílulas: `em aberto` · `finalizados` · `parados`
+- **Faixa didática** logo abaixo do hero explicando como ler as variações em % (`+X%` subiu · `-X%` caiu · cor verde = direção desejada)
+- **6 KPIs** (3×2) com borda lateral colorida, título small caps, valor grande e badge de delta no canto superior direito. O card **"Em Aberto"** mostra 3 mini-linhas explicativas:
+  - `N em atendimento` — *na nossa mão*
+  - `N pendentes` — *aguardando externos (cliente / fornecedor)*
+  - `N novos` — *ainda não atribuídos*
+  Os cards **"Total"**, **"Em Aberto"** e **"Parados"** ainda exibem mini-pílulas `Inc N · Req N` no rodapé
 - **Distribuição por Status**: barras horizontais coloridas com `count · %`
+- **Por Tipo de Chamado**: 2 colunas (Incidentes vermelho · Requisições azul) com total, `% do total`, em aberto, parados e taxa de resolução
 - **Top 5 Técnicos**: barras horizontais com paleta variada
 
 **Página 2 — Análise**
@@ -572,6 +591,9 @@ Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva,
 
 - Linha divisora + `Central de Monitoramento RPA · Minerva Foods` + `Página X / Y`
 
+> [!NOTE]
+> Versões anteriores usavam `▲`/`▼` para os deltas, mas o Helvetica embutido no jsPDF não tem esses glifos e renderizava lixo (`%²`, `%¼`). Trocamos por `+` e `-` ASCII; cor + sinal já comunicam direção.
+
 ### Snapshot do Dashboard
 
 - **PDF**: paginação automática em A4 retrato (em vez de comprimir tudo numa página) — cada página com header navy/vermelho e footer com paginação
@@ -580,12 +602,14 @@ Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva,
 
 ### Excel — abas geradas
 
-| Aba                  | Conteúdo                                                                            |
-| -------------------- | ----------------------------------------------------------------------------------- |
-| **Resumo Executivo** | KPIs principais formatados, com cores e destaques                                   |
-| **Por Técnico**      | Total · em aberto · finalizados · taxa fechamento · parados · média dias · horas    |
-| **Por Status**       | Distribuição por status com totais                                                  |
-| **Insights & Ações** | Insights tonais e lista de próximas ações com severidade                            |
+| Aba                  | Conteúdo                                                                                          |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| **Resumo Executivo** | KPIs principais formatados, com cores e destaques                                                 |
+| **Chamados**         | Lista completa de chamados com coluna **Tipo** (Incidente/Requisição), status colorido e horas    |
+| **Apontamentos**     | Apontamentos por chamado e colaborador (planejado · realizado · legado) com horas                 |
+| **Por Técnico**      | Total · em aberto · finalizados · taxa fechamento · parados · média dias · horas                  |
+| **Por Tipo**         | Total · em atendimento · pendente · novo · finalizados · parados · taxa de resolução por tipo + glossário |
+| **Insights & Ações** | Insights tonais e lista de próximas ações com severidade                                          |
 
 ---
 

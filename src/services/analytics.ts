@@ -3,6 +3,7 @@ import {
   Ticket,
   TicketHoursStatus,
   TicketTaskEntry,
+  TicketType,
 } from '../types';
 import { config, isGLPIConfigured } from '../config';
 import {
@@ -235,6 +236,13 @@ export function getStaleInfo(
 // Métricas principais
 // ======================================================
 
+/** Breakdown { incidente, requisição, sem tipo (unknown) } para um indicador qualquer. */
+export interface TypeBreakdown {
+  incident: number;
+  request: number;
+  unknown: number;
+}
+
 export interface TicketMetrics {
   total: number;
   closed: number;
@@ -259,7 +267,21 @@ export interface TicketMetrics {
   staleThresholdDays: number;
   /** Média (em dias) que os chamados em aberto estão abertos. */
   avgDaysOpen: number;
+  // ---- Breakdowns por tipo (Incidente vs Requisição) ----
+  totalByType: TypeBreakdown;
+  inProgressByType: TypeBreakdown;
+  pendingByType: TypeBreakdown;
+  newByType: TypeBreakdown;
+  staleByType: TypeBreakdown;
+  finalizedByType: TypeBreakdown;
+  openByType: TypeBreakdown;
 }
+
+const emptyTypeBreakdown = (): TypeBreakdown => ({ incident: 0, request: 0, unknown: 0 });
+
+const incrementTypeBreakdown = (acc: TypeBreakdown, type: TicketType): void => {
+  acc[type] += 1;
+};
 
 export const getTicketMetrics = (
   tickets: Ticket[],
@@ -280,15 +302,45 @@ export const getTicketMetrics = (
   let openDaysSum = 0;
   let openCount = 0;
 
+  const totalByType = emptyTypeBreakdown();
+  const inProgressByType = emptyTypeBreakdown();
+  const pendingByType = emptyTypeBreakdown();
+  const newByType = emptyTypeBreakdown();
+  const staleByType = emptyTypeBreakdown();
+  const finalizedByType = emptyTypeBreakdown();
+  const openByType = emptyTypeBreakdown();
+
   for (const t of tickets) {
     total++;
+    incrementTypeBreakdown(totalByType, t.type);
 
     const statusLower = t.status.toLowerCase();
-    if (statusLower.includes('fechado')) closed++;
-    else if (statusLower.includes('solucionado')) solved++;
-    else if (statusLower.includes('atendimento')) inProgress++;
-    else if (statusLower.includes('pendente')) pending++;
-    else if (statusLower === 'novo') newTickets++;
+    let bucket: 'closed' | 'solved' | 'inProgress' | 'pending' | 'new' | null = null;
+    if (statusLower.includes('fechado')) {
+      closed++;
+      bucket = 'closed';
+    } else if (statusLower.includes('solucionado')) {
+      solved++;
+      bucket = 'solved';
+    } else if (statusLower.includes('atendimento')) {
+      inProgress++;
+      bucket = 'inProgress';
+      incrementTypeBreakdown(inProgressByType, t.type);
+    } else if (statusLower.includes('pendente')) {
+      pending++;
+      bucket = 'pending';
+      incrementTypeBreakdown(pendingByType, t.type);
+    } else if (statusLower === 'novo') {
+      newTickets++;
+      bucket = 'new';
+      incrementTypeBreakdown(newByType, t.type);
+    }
+
+    if (bucket === 'closed' || bucket === 'solved') {
+      incrementTypeBreakdown(finalizedByType, t.type);
+    } else if (bucket === 'inProgress' || bucket === 'pending' || bucket === 'new') {
+      incrementTypeBreakdown(openByType, t.type);
+    }
 
     const planned = t.planned_time_hours || 0;
     const realized = t.realized_time_hours || 0;
@@ -310,7 +362,10 @@ export const getTicketMetrics = (
     if (stale.isOpen) {
       openCount++;
       openDaysSum += stale.daysOpen;
-      if (stale.isStale) staleCount++;
+      if (stale.isStale) {
+        staleCount++;
+        incrementTypeBreakdown(staleByType, t.type);
+      }
     }
   }
 
@@ -344,6 +399,13 @@ export const getTicketMetrics = (
     staleCount,
     staleThresholdDays,
     avgDaysOpen: Math.round(avgDaysOpen * 10) / 10,
+    totalByType,
+    inProgressByType,
+    pendingByType,
+    newByType,
+    staleByType,
+    finalizedByType,
+    openByType,
   };
 };
 
@@ -357,6 +419,36 @@ export const aggregateTicketsByStatus = (tickets: Ticket[]) => {
   return Array.from(map.entries())
     .map(([status, count]) => ({ status, count }))
     .sort((a, b) => b.count - a.count);
+};
+
+export const TYPE_LABEL: Record<TicketType, string> = {
+  incident: 'Incidente',
+  request: 'Requisição',
+  unknown: 'Sem tipo',
+};
+
+export interface TypeAggregate {
+  type: TicketType;
+  label: string;
+  count: number;
+}
+
+/**
+ * Conta chamados por tipo (Incidente / Requisição / Sem tipo).
+ * Retorna em ordem decrescente, omitindo a fatia "unknown" quando vier vazia.
+ */
+export const aggregateTicketsByType = (tickets: Ticket[]): TypeAggregate[] => {
+  const counts: TypeBreakdown = emptyTypeBreakdown();
+  for (const t of tickets) incrementTypeBreakdown(counts, t.type);
+
+  const entries: TypeAggregate[] = [
+    { type: 'incident', label: TYPE_LABEL.incident, count: counts.incident },
+    { type: 'request', label: TYPE_LABEL.request, count: counts.request },
+  ];
+  if (counts.unknown > 0) {
+    entries.push({ type: 'unknown', label: TYPE_LABEL.unknown, count: counts.unknown });
+  }
+  return entries.sort((a, b) => b.count - a.count);
 };
 
 export const aggregateTicketsByTechnician = (tickets: Ticket[]) => {
@@ -418,6 +510,8 @@ export interface TechnicianMetrics {
   totalRealizedHours: number;
   avgWorkHours: number;
   closureRate: number;
+  totalByType: TypeBreakdown;
+  openByType: TypeBreakdown;
 }
 
 export const getTechnicianMetrics = (
@@ -437,6 +531,8 @@ export const getTechnicianMetrics = (
     totalRealizedHours: m.totalRealizedHours,
     avgWorkHours: m.avgWorkHours,
     closureRate: m.closureRate,
+    totalByType: m.totalByType,
+    openByType: m.openByType,
   };
 };
 

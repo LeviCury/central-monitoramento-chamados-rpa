@@ -13,6 +13,7 @@ import {
   STATUS_MAP,
   STATUS_NAME_TO_ID,
   PRIORITY_NAME_TO_ID,
+  TYPE_MAP,
 } from './constants';
 import {
   glpiSearchResponseSchema,
@@ -109,12 +110,30 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
   return criteria;
 }
 
+/**
+ * Resolve `type` do GLPI tanto quando vem como número (1/2) quanto
+ * como string ("Incidente"/"Requisição") com expand_dropdowns=true.
+ */
+function resolveTicketType(raw: unknown): 'incident' | 'request' | 'unknown' {
+  if (raw == null) return 'unknown';
+  if (typeof raw === 'number') {
+    if (raw === 1) return 'incident';
+    if (raw === 2) return 'request';
+    return 'unknown';
+  }
+  const text = String(raw).trim().toLowerCase();
+  if (text === '1' || text.startsWith('incid')) return 'incident';
+  if (text === '2' || text.startsWith('requis') || text.startsWith('request')) return 'request';
+  return 'unknown';
+}
+
 function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
   const id = raw['2'] ?? raw.id ?? '';
   const title = raw['1'] ?? raw.name ?? '';
   const entity = raw['80'] ?? raw.entity ?? '';
   const status = raw['12'] ?? raw.status ?? '';
   const priority = raw['3'] ?? raw.priority ?? '';
+  const typeRaw = raw['14'] ?? raw.type ?? null;
   const requester = raw['4'] ?? raw.requester ?? '';
   const technician = raw['5'] ?? raw.technician ?? '';
   const techGroup = raw['8'] ?? raw.technician_group ?? '';
@@ -130,6 +149,8 @@ function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
     typeof priority === 'number'
       ? PRIORITY_MAP[priority] ?? `Prioridade ${priority}`
       : String(priority);
+  const ticketType = resolveTicketType(typeRaw);
+  void TYPE_MAP; // mapeamento exposto para outros consumidores
 
   return {
     id: String(id),
@@ -137,6 +158,7 @@ function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
     entity: String(entity),
     assigned_technician: String(technician),
     status: statusText,
+    type: ticketType,
     opened_date: String(dateOpened),
     updated_date: String(dateMod),
     resolved_date: dateSolved ? String(dateSolved) : dateClosed ? String(dateClosed) : null,
@@ -167,6 +189,7 @@ export async function fetchTicketsFromGLPI(params: GLPISearchParams): Promise<Ti
       GLPI_FIELDS.ENTITY,
       GLPI_FIELDS.STATUS,
       GLPI_FIELDS.PRIORITY,
+      GLPI_FIELDS.TYPE,
       GLPI_FIELDS.REQUESTER,
       GLPI_FIELDS.TECHNICIAN,
       GLPI_FIELDS.TECHNICIAN_GROUP,

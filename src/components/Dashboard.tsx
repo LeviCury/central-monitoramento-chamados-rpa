@@ -5,6 +5,7 @@ import { useTheme } from '../contexts/useTheme';
 import TicketFilterPanel from './TicketFilterPanel';
 import StatusChart from './StatusChart';
 import TechnicianChart from './TechnicianChart';
+import TypeChart from './TypeChart';
 import TimelineChart from './TimelineChart';
 import TicketTable from './TicketTable';
 import PlannedVsRealizedChart from './PlannedVsRealizedChart';
@@ -23,6 +24,7 @@ import {
   aggregateTicketsByDate,
   aggregateTicketsByStatus,
   aggregateTicketsByTechnician,
+  aggregateTicketsByType,
   aggregateTicketsHeatmap,
   computeMetricsDelta,
   fetchTickets,
@@ -62,21 +64,29 @@ export default function Dashboard() {
     removePreset,
   } = useDashboardFilters();
   const { presentationMode, tvMode, toggle, toggleTv, ref } = usePresentationMode();
-  const { drillStatus, drillTechnician, drillDate } = useDrillDown(filters, setFilters);
+  const { drillStatus, drillTechnician, drillDate, drillType } = useDrillDown(filters, setFilters);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [exporting, setExporting] = useState(false);
   const [previousMetrics, setPreviousMetrics] = useState<TicketMetrics | null>(null);
   const captureRef = useRef<HTMLElement | null>(null);
 
-  const { tickets, isLoading, isFetching, isLoadingHours, isError, error, lastUpdate, refetch } =
+  const { tickets: rawTickets, isLoading, isFetching, isLoadingHours, isError, error, lastUpdate, refetch } =
     useGLPITickets({ filters, groupId });
 
   const timeAgo = useTimeAgo(lastUpdate);
   const hasDateFilter = Boolean(filters.dateRange.start && filters.dateRange.end);
 
+  // Filtro "Tipo" aplicado client-side. Vazio = todos.
+  const tickets = useMemo(() => {
+    const types = filters.types ?? [];
+    if (types.length === 0) return rawTickets;
+    return rawTickets.filter(t => types.includes(t.type));
+  }, [rawTickets, filters.types]);
+
   const metrics = useMemo(() => getTicketMetrics(tickets), [tickets]);
   const statusData = useMemo(() => aggregateTicketsByStatus(tickets), [tickets]);
   const technicianData = useMemo(() => aggregateTicketsByTechnician(tickets), [tickets]);
+  const typeData = useMemo(() => aggregateTicketsByType(tickets), [tickets]);
   const timelineData = useMemo(() => aggregateTicketsByDate(tickets), [tickets]);
   const heatmapData = useMemo(() => aggregateTicketsHeatmap(tickets), [tickets]);
   const plannedVsRealizedData = useMemo(
@@ -86,10 +96,12 @@ export default function Dashboard() {
 
   const filterOptions = useMemo(
     () => ({
-      statuses: getUniqueStatuses(tickets),
-      technicians: getUniqueTechnicians(tickets),
+      // Para o painel de filtros, mostramos as opções de status/técnico do
+      // dataset bruto — assim não somem ao aplicar o filtro "Tipo".
+      statuses: getUniqueStatuses(rawTickets),
+      technicians: getUniqueTechnicians(rawTickets),
     }),
-    [tickets]
+    [rawTickets]
   );
 
   const delta = useMemo(
@@ -106,6 +118,7 @@ export default function Dashboard() {
       ...prev,
       statuses: item.filter?.statuses ?? prev.statuses,
       technicians: item.filter?.technicians ?? prev.technicians,
+      types: prev.types ?? [],
     }));
     if (item.filter.staleOnly) {
       pushToast(
@@ -254,10 +267,13 @@ export default function Dashboard() {
     },
     {
       id: 'mix',
-      label: 'Status & Técnicos',
+      label: 'Status, Tipo & Técnicos',
       content: (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <StatusChart data={statusData} />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <StatusChart data={statusData} />
+            <TypeChart data={typeData} />
+          </div>
           <TechnicianChart data={technicianData} />
         </div>
       ),
@@ -427,7 +443,14 @@ export default function Dashboard() {
                         selectedStatuses={filters.statuses}
                       />
                     </div>
-                    <div className="animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                    <div className="animate-fade-in" style={{ animationDelay: '0.28s' }}>
+                      <TypeChart
+                        data={typeData}
+                        onSelectType={drillType}
+                        selectedTypes={filters.types}
+                      />
+                    </div>
+                    <div className="animate-fade-in lg:col-span-2" style={{ animationDelay: '0.3s' }}>
                       <TechnicianChart
                         data={technicianData}
                         onSelectTechnician={drillTechnician}
@@ -444,8 +467,9 @@ export default function Dashboard() {
                 <Heatmap data={heatmapData} />
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <StatusChart data={statusData} />
-                  <TechnicianChart data={technicianData} />
+                  <TypeChart data={typeData} />
                 </div>
+                <TechnicianChart data={technicianData} />
               </div>
             )}
 

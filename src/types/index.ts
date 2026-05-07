@@ -28,12 +28,21 @@ export interface CollaboratorHours {
   tasks: TicketTaskEntry[];
 }
 
+export type TicketType = 'incident' | 'request' | 'unknown';
+
 export interface Ticket {
   id: string;
   title: string;
   entity: string;
   assigned_technician: string;
   status: string;
+  /**
+   * Tipo do chamado no GLPI (campo 14):
+   * - `incident`  = Incidente (problema que afetou operação)
+   * - `request`   = Requisição (solicitação, melhoria, projeto)
+   * - `unknown`   = quando o GLPI não devolveu o campo
+   */
+  type: TicketType;
   opened_date: string;
   updated_date: string;
   resolved_date: string | null;
@@ -59,4 +68,6 @@ export interface FilterState {
   statuses: string[];
   priorities: string[];
   technicians: string[];
+  /** Lista de tipos selecionados: 'incident' | 'request'. Vazio = todos. */
+  types: TicketType[];
 }

@@ -300,19 +300,20 @@ export async function exportToExcel({
   ticketsSheet.columns = [
     { width: 12 },  // A - ID
     { width: 60 },  // B - Título
-    { width: 25 },  // C - Status
-    { width: 30 },  // D - Técnico
-    { width: 16 },  // E - Planejado
-    { width: 16 },  // F - Realizado
-    { width: 26 },  // G - Saldo
-    { width: 16 },  // H - Legado
-    { width: 24 },  // I - Status horas
-    { width: 20 },  // J - Data Abertura
-    { width: 20 },  // K - Última Atualização
+    { width: 14 },  // C - Tipo
+    { width: 25 },  // D - Status
+    { width: 30 },  // E - Técnico
+    { width: 16 },  // F - Planejado
+    { width: 16 },  // G - Realizado
+    { width: 26 },  // H - Saldo
+    { width: 16 },  // I - Legado
+    { width: 24 },  // J - Status horas
+    { width: 20 },  // K - Data Abertura
+    { width: 20 },  // L - Última Atualização
   ];
 
   // Título da planilha
-  ticketsSheet.mergeCells('A1:K1');
+  ticketsSheet.mergeCells('A1:L1');
   const ticketsTitleCell = ticketsSheet.getCell('A1');
   ticketsTitleCell.value = '📋 LISTA COMPLETA DE CHAMADOS';
   ticketsTitleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
@@ -321,7 +322,7 @@ export async function exportToExcel({
   ticketsSheet.getRow(1).height = 35;
 
   // Info do período
-  ticketsSheet.mergeCells('A2:K2');
+  ticketsSheet.mergeCells('A2:L2');
   const ticketsPeriodCell = ticketsSheet.getCell('A2');
   ticketsPeriodCell.value = `${periodText} | Total: ${tickets.length} chamados`;
   ticketsPeriodCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
@@ -333,6 +334,7 @@ export async function exportToExcel({
   const headers = [
     'ID',
     'Título',
+    'Tipo',
     'Status',
     'Técnico Responsável',
     'Horas Planejadas',
@@ -360,6 +362,17 @@ export async function exportToExcel({
     };
   });
 
+  const TYPE_LABEL: Record<Ticket['type'], string> = {
+    incident: 'Incidente',
+    request: 'Requisição',
+    unknown: 'Sem tipo',
+  };
+  const TYPE_BG: Record<Ticket['type'], string> = {
+    incident: COLORS.red,
+    request: 'FF3B82F6',
+    unknown: COLORS.gray500,
+  };
+
   // Dados dos chamados
   tickets.forEach((ticket, index) => {
     const row = ticketsSheet.getRow(index + 4);
@@ -381,8 +394,15 @@ export async function exportToExcel({
     titleCellTicket.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     titleCellTicket.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
 
+    // Tipo
+    const typeCell = row.getCell(3);
+    typeCell.value = TYPE_LABEL[ticket.type];
+    typeCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.white } };
+    typeCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TYPE_BG[ticket.type] } };
+    typeCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
     // Status
-    const statusCell = row.getCell(3);
+    const statusCell = row.getCell(4);
     statusCell.value = ticket.status;
     const statusColor = STATUS_COLORS[ticket.status] || COLORS.gray500;
     statusCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.white } };
@@ -390,28 +410,28 @@ export async function exportToExcel({
     statusCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Técnico
-    const techCell = row.getCell(4);
+    const techCell = row.getCell(5);
     techCell.value = formatTechnicianName(ticket.assigned_technician);
     techCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
     techCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     techCell.alignment = { horizontal: 'left', vertical: 'middle' };
 
     // Horas Planejadas
-    const plannedCell = row.getCell(5);
+    const plannedCell = row.getCell(6);
     plannedCell.value = formatHoursMinutes(ticket.planned_time_hours);
     plannedCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
     plannedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     plannedCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Horas Realizadas
-    const realizedCell = row.getCell(6);
+    const realizedCell = row.getCell(7);
     realizedCell.value = formatHoursMinutes(ticket.realized_time_hours);
     realizedCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.green } };
     realizedCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     realizedCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Saldo Planejado x Realizado
-    const balanceCell = row.getCell(7);
+    const balanceCell = row.getCell(8);
     const ticketBalance = (ticket.planned_time_hours || 0) - (ticket.realized_time_hours || 0);
     balanceCell.value = getHoursBalanceLabel(ticketBalance);
     balanceCell.font = { name: 'Calibri', size: 10, color: { argb: ticketBalance < 0 ? COLORS.red : COLORS.green } };
@@ -419,35 +439,35 @@ export async function exportToExcel({
     balanceCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Horas Legado
-    const legacyCell = row.getCell(8);
+    const legacyCell = row.getCell(9);
     legacyCell.value = formatHoursMinutes(ticket.legacy_time_hours);
     legacyCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.amber } };
     legacyCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     legacyCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Status Apontamento
-    const hoursStatusCell = row.getCell(9);
+    const hoursStatusCell = row.getCell(10);
     hoursStatusCell.value = getHoursStatusLabel(ticket.hours_status);
     hoursStatusCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.navy } };
     hoursStatusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     hoursStatusCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Data Abertura
-    const dateCell = row.getCell(10);
+    const dateCell = row.getCell(11);
     dateCell.value = formatDate(ticket.created_at);
     dateCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.gray500 } };
     dateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     dateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Última Atualização
-    const updateCell = row.getCell(11);
+    const updateCell = row.getCell(12);
     updateCell.value = formatDate(ticket.updated_date || ticket.created_at);
     updateCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.gray500 } };
     updateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
     updateCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
     // Bordas para todas as células
-    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach(col => {
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].forEach(col => {
       row.getCell(col).border = {
         top: { style: 'thin', color: { argb: COLORS.gray200 } },
         left: { style: 'thin', color: { argb: COLORS.gray200 } },
@@ -460,7 +480,7 @@ export async function exportToExcel({
   // Adicionar filtros
   ticketsSheet.autoFilter = {
     from: { row: 3, column: 1 },
-    to: { row: tickets.length + 3, column: 11 },
+    to: { row: tickets.length + 3, column: 12 },
   };
 
   // ==========================================
@@ -688,7 +708,202 @@ export async function exportToExcel({
   }
 
   // ==========================================
-  // PLANILHA 5: INSIGHTS & AÇÕES
+  // PLANILHA 5: POR TIPO (Incidente x Requisição)
+  // ==========================================
+  const typeSheet = workbook.addWorksheet('Por Tipo', {
+    properties: { tabColor: { argb: COLORS.amber } },
+    views: [{ showGridLines: false }],
+  });
+
+  typeSheet.columns = [
+    { width: 3 },
+    { width: 22 }, // Tipo
+    { width: 12 }, // Total
+    { width: 18 }, // Em Atendimento
+    { width: 14 }, // Pendente
+    { width: 12 }, // Novo
+    { width: 14 }, // Finalizados
+    { width: 12 }, // Parados
+    { width: 18 }, // Taxa Resolução
+    { width: 3 },
+  ];
+
+  typeSheet.mergeCells('B2:I2');
+  const typeTitle = typeSheet.getCell('B2');
+  typeTitle.value = 'CHAMADOS POR TIPO';
+  typeTitle.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
+  typeTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navy } };
+  typeTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+  typeSheet.getRow(2).height = 32;
+
+  typeSheet.mergeCells('B3:I3');
+  const typeSubtitle = typeSheet.getCell('B3');
+  typeSubtitle.value = `${periodText} · Incidente = algo quebrou · Requisição = solicitação/melhoria/projeto`;
+  typeSubtitle.font = { name: 'Calibri', size: 10, italic: true, color: { argb: COLORS.gray500 } };
+  typeSubtitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.gray100 } };
+  typeSubtitle.alignment = { horizontal: 'center', vertical: 'middle' };
+  typeSheet.getRow(3).height = 22;
+
+  const typeHeaders = [
+    'Tipo',
+    'Total',
+    'Em Atendimento',
+    'Pendente',
+    'Novo',
+    'Finalizados',
+    'Parados',
+    'Taxa Resolução',
+  ];
+  const typeHeaderRow = typeSheet.getRow(5);
+  typeHeaderRow.height = 28;
+  typeHeaders.forEach((header, idx) => {
+    const cell = typeHeaderRow.getCell(idx + 2);
+    cell.value = header;
+    cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navyLight } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: COLORS.navy } },
+      left: { style: 'thin', color: { argb: COLORS.navy } },
+      bottom: { style: 'medium', color: { argb: COLORS.navy } },
+      right: { style: 'thin', color: { argb: COLORS.navy } },
+    };
+  });
+
+  const tIncTotal = metrics.totalByType.incident;
+  const tReqTotal = metrics.totalByType.request;
+  const totalAll = tIncTotal + tReqTotal + metrics.totalByType.unknown;
+
+  const typeRows: Array<{
+    label: string;
+    color: string;
+    total: number;
+    inProgress: number;
+    pending: number;
+    newCount: number;
+    finalized: number;
+    stale: number;
+  }> = [
+    {
+      label: 'Incidentes',
+      color: COLORS.red,
+      total: tIncTotal,
+      inProgress: metrics.inProgressByType.incident,
+      pending: metrics.pendingByType.incident,
+      newCount: metrics.newByType.incident,
+      finalized: metrics.finalizedByType.incident,
+      stale: metrics.staleByType.incident,
+    },
+    {
+      label: 'Requisições',
+      color: 'FF3B82F6',
+      total: tReqTotal,
+      inProgress: metrics.inProgressByType.request,
+      pending: metrics.pendingByType.request,
+      newCount: metrics.newByType.request,
+      finalized: metrics.finalizedByType.request,
+      stale: metrics.staleByType.request,
+    },
+    {
+      label: 'Total',
+      color: COLORS.navy,
+      total: totalAll,
+      inProgress: metrics.inProgress,
+      pending: metrics.pending,
+      newCount: metrics.newTickets,
+      finalized: metrics.finalized,
+      stale: metrics.staleCount,
+    },
+  ];
+
+  typeRows.forEach((tr, idx) => {
+    const r = typeSheet.getRow(6 + idx);
+    r.height = 26;
+    const isTotalRow = idx === typeRows.length - 1;
+    const closure = tr.total > 0 ? `${Math.round((tr.finalized / tr.total) * 100)}%` : '0%';
+    const cells: Array<{ value: string | number; bold?: boolean }> = [
+      { value: tr.label, bold: true },
+      { value: tr.total, bold: isTotalRow },
+      { value: tr.inProgress, bold: isTotalRow },
+      { value: tr.pending, bold: isTotalRow },
+      { value: tr.newCount, bold: isTotalRow },
+      { value: tr.finalized, bold: isTotalRow },
+      { value: tr.stale, bold: isTotalRow },
+      { value: closure, bold: isTotalRow },
+    ];
+    cells.forEach((c, ci) => {
+      const cell = r.getCell(ci + 2);
+      cell.value = c.value;
+      if (ci === 0) {
+        cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: tr.color } };
+      } else {
+        cell.font = {
+          name: 'Calibri',
+          size: 11,
+          bold: c.bold,
+          color: {
+            argb:
+              ci === 6 && tr.stale > 0
+                ? COLORS.red
+                : isTotalRow
+                  ? COLORS.navy
+                  : COLORS.navy,
+          },
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: isTotalRow ? COLORS.gray100 : COLORS.gray50 },
+        };
+      }
+      cell.alignment = { horizontal: ci === 0 ? 'left' : 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.gray200 } },
+        left: { style: 'thin', color: { argb: COLORS.gray200 } },
+        bottom: {
+          style: isTotalRow ? 'medium' : 'thin',
+          color: { argb: COLORS.gray200 },
+        },
+        right: { style: 'thin', color: { argb: COLORS.gray200 } },
+      };
+    });
+  });
+
+  // Glossário curto
+  let glossY = 11;
+  typeSheet.mergeCells(`B${glossY}:I${glossY}`);
+  const glossTitle = typeSheet.getCell(`B${glossY}`);
+  glossTitle.value = 'COMO LER OS ESTADOS';
+  glossTitle.font = { name: 'Calibri', size: 12, bold: true, color: { argb: COLORS.navy } };
+  glossTitle.alignment = { horizontal: 'left', vertical: 'middle' };
+  typeSheet.getRow(glossY).height = 26;
+  glossY++;
+
+  const glossEntries: Array<[string, string]> = [
+    ['Em atendimento', 'Atribuído a um técnico — está na nossa mão.'],
+    ['Pendente', 'Aguardando algo externo (cliente / fornecedor / outro time).'],
+    ['Novo', 'Criado mas ainda não foi atribuído a um técnico.'],
+    ['Finalizado', 'Solucionado ou Fechado.'],
+    ['Parado', `Em aberto há mais de ${metrics.staleThresholdDays} dias.`],
+  ];
+  for (const [term, desc] of glossEntries) {
+    const tCell = typeSheet.getCell(`B${glossY}`);
+    tCell.value = term;
+    tCell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: COLORS.navy } };
+    tCell.alignment = { horizontal: 'left', vertical: 'middle' };
+
+    typeSheet.mergeCells(`C${glossY}:I${glossY}`);
+    const dCell = typeSheet.getCell(`C${glossY}`);
+    dCell.value = desc;
+    dCell.font = { name: 'Calibri', size: 10, color: { argb: COLORS.gray500 } };
+    dCell.alignment = { horizontal: 'left', vertical: 'middle' };
+    typeSheet.getRow(glossY).height = 20;
+    glossY++;
+  }
+
+  // ==========================================
+  // PLANILHA 6: INSIGHTS & AÇÕES
   // ==========================================
   const insightsSheet = workbook.addWorksheet('Insights & Ações', {
     properties: { tabColor: { argb: COLORS.amber } },

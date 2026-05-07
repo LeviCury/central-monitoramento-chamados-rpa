@@ -5,7 +5,7 @@
  * - Seletor de grupo técnico.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FilterState } from '../types';
+import { FilterState, TicketType } from '../types';
 import { config } from '../config';
 
 const PRESETS_KEY = 'minerva-dashboard-presets-v1';
@@ -23,7 +23,28 @@ const EMPTY_FILTERS: FilterState = {
   statuses: [],
   priorities: [],
   technicians: [],
+  types: [],
 };
+
+const VALID_TYPES: TicketType[] = ['incident', 'request', 'unknown'];
+
+function parseTypes(raw: string[]): TicketType[] {
+  return raw
+    .map(value => value.toLowerCase())
+    .map(value => {
+      if (value === 'incidente' || value === 'incident') return 'incident' as const;
+      if (value === 'requisicao' || value === 'requisição' || value === 'request') return 'request' as const;
+      if (value === 'unknown' || value === 'sem-tipo' || value === 'sem_tipo') return 'unknown' as const;
+      return null;
+    })
+    .filter((v): v is TicketType => v !== null && VALID_TYPES.includes(v));
+}
+
+function serializeTypes(types: TicketType[]): string {
+  return types
+    .map(t => (t === 'incident' ? 'incidente' : t === 'request' ? 'requisicao' : 'sem-tipo'))
+    .join(',');
+}
 
 function readUrlState(): { filters: FilterState; groupId: string | null } {
   if (typeof window === 'undefined') return { filters: EMPTY_FILTERS, groupId: null };
@@ -43,6 +64,7 @@ function readUrlState(): { filters: FilterState; groupId: string | null } {
       statuses: split('status'),
       priorities: split('priority'),
       technicians: split('tech'),
+      types: parseTypes(split('type')),
     },
     groupId: params.get('group'),
   };
@@ -56,6 +78,7 @@ function writeUrlState(filters: FilterState, groupId: string) {
   if (filters.statuses.length) params.set('status', filters.statuses.join(','));
   if (filters.priorities.length) params.set('priority', filters.priorities.join(','));
   if (filters.technicians.length) params.set('tech', filters.technicians.join(','));
+  if (filters.types.length) params.set('type', serializeTypes(filters.types));
   if (groupId && groupId !== config.glpi.defaultGroupId) params.set('group', groupId);
 
   const queryString = params.toString();
@@ -134,7 +157,11 @@ export function useDashboardFilters() {
   );
 
   const applyPreset = useCallback((preset: FilterPreset) => {
-    setFilters(preset.filters);
+    setFilters({
+      ...EMPTY_FILTERS,
+      ...preset.filters,
+      types: preset.filters.types ?? [],
+    });
     setGroupIdState(preset.groupId);
   }, []);
 

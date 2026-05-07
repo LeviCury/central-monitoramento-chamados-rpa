@@ -3,7 +3,7 @@
  * disparam alterações de filtro no Dashboard.
  */
 import { useCallback } from 'react';
-import { FilterState } from '../types';
+import { FilterState, TicketType } from '../types';
 
 export function useDrillDown(
   filters: FilterState,
@@ -41,5 +41,17 @@ export function useDrillDown(
     [filters, setFilters]
   );
 
-  return { drillStatus, drillTechnician, drillDate };
+  const drillType = useCallback(
+    (type: TicketType) => {
+      const current = filters.types ?? [];
+      const has = current.includes(type);
+      setFilters({
+        ...filters,
+        types: has ? current.filter(t => t !== type) : [type],
+      });
+    },
+    [filters, setFilters]
+  );
+
+  return { drillStatus, drillTechnician, drillDate, drillType };
 }

@@ -1,5 +1,5 @@
-import { Calendar, Filter, X, ChevronDown, Clock } from 'lucide-react';
-import { FilterState } from '../types';
+import { Calendar, Filter, X, ChevronDown, Clock, Tag } from 'lucide-react';
+import { FilterState, TicketType } from '../types';
 import { useState } from 'react';
 
 // Tipos de período rápido
@@ -86,6 +86,7 @@ export default function TicketFilterPanel({
   const [expandedSections, setExpandedSections] = useState({
     period: true,
     status: true,
+    type: true,
     priority: true,
     technician: true,
   });
@@ -125,6 +126,29 @@ export default function TicketFilterPanel({
     onFilterChange({ ...filters, technicians: newTechnicians });
   };
 
+  const handleTypeToggle = (type: TicketType) => {
+    const current = filters.types ?? [];
+    const newTypes = current.includes(type)
+      ? current.filter(t => t !== type)
+      : [...current, type];
+    onFilterChange({ ...filters, types: newTypes });
+  };
+
+  const TYPE_OPTIONS: { id: TicketType; label: string; subtitle: string; color: string }[] = [
+    {
+      id: 'incident',
+      label: 'Incidente',
+      subtitle: 'algo quebrou na operação',
+      color: 'minerva-red',
+    },
+    {
+      id: 'request',
+      label: 'Requisição',
+      subtitle: 'solicitação / melhoria / projeto',
+      color: 'sky-500',
+    },
+  ];
+
   const handleDateChange = (field: 'start' | 'end', value: string) => {
     setSelectedQuickPeriod(null); // Limpa seleção de período rápido ao alterar manualmente
     onFilterChange({
@@ -133,19 +157,23 @@ export default function TicketFilterPanel({
     });
   };
 
+  const typesActive = filters.types ?? [];
+
   const hasActiveFilters =
     filters.dateRange.start ||
     filters.dateRange.end ||
     filters.statuses.length > 0 ||
     filters.priorities.length > 0 ||
-    filters.technicians.length > 0;
+    filters.technicians.length > 0 ||
+    typesActive.length > 0;
 
   const activeFilterCount =
     (filters.dateRange.start ? 1 : 0) +
     (filters.dateRange.end ? 1 : 0) +
     filters.statuses.length +
     filters.priorities.length +
-    filters.technicians.length;
+    filters.technicians.length +
+    typesActive.length;
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva overflow-hidden">
@@ -172,6 +200,7 @@ export default function TicketFilterPanel({
                   statuses: [],
                   priorities: [],
                   technicians: [],
+                  types: [],
                 });
               }}
               className="flex items-center gap-1 px-3 py-1.5 bg-minerva-red/20 hover:bg-minerva-red/30 rounded-lg text-white text-xs font-medium transition-colors"
@@ -306,6 +335,65 @@ export default function TicketFilterPanel({
             )}
           </div>
         )}
+
+        {/* Filtro de Tipo */}
+        <div className="border border-gray-100 dark:border-slate-700 rounded-xl overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('type')}
+            aria-expanded={expandedSections.type}
+            className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-slate-700 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4 text-minerva-navy dark:text-white" />
+              <span className="text-sm font-medium text-minerva-navy dark:text-white">Tipo</span>
+              {typesActive.length > 0 && (
+                <span className="px-2 py-0.5 bg-minerva-navy text-white text-xs rounded-full">
+                  {typesActive.length}
+                </span>
+              )}
+            </div>
+            <ChevronDown
+              className={`w-4 h-4 text-minerva-navy/60 dark:text-white/60 transition-transform ${expandedSections.type ? 'rotate-180' : ''}`}
+              aria-hidden
+            />
+          </button>
+
+          {expandedSections.type && (
+            <div className="p-4 bg-white dark:bg-slate-800">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Mostrar apenas estes tipos. Vazio = todos.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {TYPE_OPTIONS.map(opt => {
+                  const active = typesActive.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => handleTypeToggle(opt.id)}
+                      aria-pressed={active}
+                      className={`px-3 py-2 text-xs font-medium rounded-lg transition-all border text-left ${
+                        active
+                          ? 'bg-minerva-navy text-white border-minerva-navy shadow-sm'
+                          : 'bg-gray-50 dark:bg-slate-700 text-minerva-navy dark:text-white border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-600'
+                      }`}
+                    >
+                      <span className="block leading-tight">{opt.label}</span>
+                      <span
+                        className={`block text-[10px] font-normal mt-0.5 ${
+                          active ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'
+                        }`}
+                      >
+                        {opt.subtitle}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Filtro de Prioridade */}
         {priorities.length > 0 && (
