@@ -409,57 +409,40 @@ function formatDeltaText(delta: number): { sign: string; text: string } {
   };
 }
 
-function drawDeltaBadge(
-  pdf: jsPDF,
-  x: number,
-  y: number,
-  delta: number,
-  inverse = false
-): { width: number; height: number } {
-  const isUp = delta > 0;
-  const isFlat = delta === 0;
-  const isGood = isFlat ? null : inverse ? !isUp : isUp;
-  const badgeColor: RGB = isFlat ? BRAND.slate : isGood ? BRAND.green : BRAND.red;
-  const { text } = formatDeltaText(delta);
-
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(7);
-  const textW = pdf.getTextWidth(text);
-  const padX = 2.4;
-  const badgeW = textW + padX * 2;
-  const badgeH = 4.6;
-
-  setFill(pdf, badgeColor);
-  pdf.roundedRect(x, y, badgeW, badgeH, 1.2, 1.2, 'F');
-  setColor(pdf, BRAND.white);
-  pdf.text(text, x + badgeW / 2, y + 3.3, { align: 'center' });
-
-  return { width: badgeW, height: badgeH };
-}
-
 function drawTypePillsInline(
   pdf: jsPDF,
   x: number,
   y: number,
-  bd: TypeBreakdown
+  bd: TypeBreakdown,
+  /** Largura máxima disponível — se ultrapassar, pula linha. */
+  maxWidth?: number
 ): void {
   const items: Array<{ label: string; color: RGB }> = [
-    { label: `Inc ${bd.incident}`, color: BRAND.red },
-    { label: `Req ${bd.request}`, color: BRAND.blue },
+    { label: `Incidente ${bd.incident}`, color: BRAND.red },
+    { label: `Requisicao ${bd.request}`, color: BRAND.blue },
   ];
-  if (bd.unknown > 0) items.push({ label: `? ${bd.unknown}`, color: BRAND.slate });
+  if (bd.unknown > 0) items.push({ label: `Sem tipo ${bd.unknown}`, color: BRAND.slate });
 
-  let cursor = x;
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(6.8);
+  pdf.setFontSize(7);
+  const pillH = 4;
+  const padX = 3;
+  const gap = 2;
+
+  let cx = x;
+  let cy = y;
   for (const item of items) {
-    const w = pdf.getTextWidth(item.label) + 4.5;
-    const h = 3.6;
+    const textW = pdf.getTextWidth(item.label);
+    const w = textW + padX * 2;
+    if (maxWidth !== undefined && cx - x + w > maxWidth) {
+      cx = x;
+      cy += pillH + 2;
+    }
     setFill(pdf, item.color);
-    pdf.roundedRect(cursor, y, w, h, h / 2, h / 2, 'F');
+    pdf.roundedRect(cx, cy, w, pillH, pillH / 2, pillH / 2, 'F');
     setColor(pdf, BRAND.white);
-    pdf.text(item.label, cursor + w / 2, y + 2.55, { align: 'center' });
-    cursor += w + 1.5;
+    pdf.text(item.label, cx + w / 2, cy + 2.85, { align: 'center' });
+    cx += w + gap;
   }
 }
 
@@ -471,77 +454,111 @@ function drawKpiCard(
   h: number,
   c: KpiCard
 ): void {
+  // Fundo + borda lateral
   setFill(pdf, BRAND.cream);
-  pdf.roundedRect(x, y, w, h, 2, 2, 'F');
-
+  pdf.roundedRect(x, y, w, h, 2.5, 2.5, 'F');
   setFill(pdf, c.color);
   pdf.roundedRect(x, y, 2.5, h, 1.2, 1.2, 'F');
 
-  const innerLeft = x + 7;
-  const innerRight = x + w - 4;
+  const innerLeft = x + 8;
+  const innerRight = x + w - 5;
+  const innerWidth = innerRight - innerLeft;
 
+  // Cabeçalho: título e valor
   setColor(pdf, BRAND.muted);
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(6.8);
-  pdf.text(c.title.toUpperCase(), innerLeft, y + 5.6);
+  pdf.setFontSize(7);
+  const titleLines = pdf.splitTextToSize(c.title.toUpperCase(), innerWidth);
+  pdf.text(titleLines[0], innerLeft, y + 6);
 
-  // Valor: tamanho dinâmico em função do tamanho do texto
+  // Valor (tamanho dinâmico para não vazar)
   setColor(pdf, BRAND.navy);
   pdf.setFont('helvetica', 'bold');
-  const valueFont = c.value.length > 7 ? 16 : c.value.length > 5 ? 18 : 20;
+  const valueFont = c.value.length > 8 ? 18 : c.value.length > 6 ? 20 : 24;
   pdf.setFontSize(valueFont);
-  pdf.text(c.value, innerLeft, y + 16);
+  pdf.text(c.value, innerLeft, y + 18);
 
-  // Delta badge (canto superior direito)
-  if (c.delta !== undefined && c.delta !== null && Number.isFinite(c.delta)) {
-    const { text } = formatDeltaText(c.delta);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(7);
-    const textW = pdf.getTextWidth(text);
-    const badgeW = textW + 4.8;
-    drawDeltaBadge(pdf, innerRight - badgeW, y + 3, c.delta, c.deltaInverse);
-  }
+  let cursorY = y + 22;
 
-  // Subtítulo
-  setColor(pdf, BRAND.muted);
-  pdf.setFont('helvetica', 'normal');
+  // Subtítulo principal
   if (c.subtitleLines && c.subtitleLines.length > 0) {
-    let subY = y + 22;
-    pdf.setFontSize(7.5);
+    cursorY += 2;
     for (const line of c.subtitleLines) {
-      // valor em negrito navy + label em muted + hint em itálico mais clarinho
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
+      pdf.setFontSize(8.5);
       setColor(pdf, BRAND.navy);
       const valueText = String(line.value);
-      pdf.text(valueText, innerLeft, subY);
+      pdf.text(valueText, innerLeft, cursorY);
       const valueW = pdf.getTextWidth(valueText);
 
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(7);
+      pdf.setFontSize(7.5);
       setColor(pdf, BRAND.text);
-      pdf.text(' ' + line.label, innerLeft + valueW, subY);
+      pdf.text(' ' + line.label, innerLeft + valueW, cursorY);
 
       if (line.hint) {
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(6.5);
         setColor(pdf, BRAND.muted);
-        const hintLines = pdf.splitTextToSize(line.hint, w - 10);
-        pdf.text(hintLines[0], innerLeft, subY + 3);
-        subY += 7;
+        const hintLines = pdf.splitTextToSize(line.hint, innerWidth);
+        pdf.text(hintLines[0], innerLeft, cursorY + 3.2);
+        cursorY += 7.5;
       } else {
-        subY += 4.5;
+        cursorY += 4.8;
       }
     }
   } else if (c.subtitle) {
-    pdf.setFontSize(7.5);
-    const subLines = pdf.splitTextToSize(c.subtitle, w - 10);
-    pdf.text(subLines, innerLeft, y + 22);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    setColor(pdf, BRAND.text);
+    const subLines = pdf.splitTextToSize(c.subtitle, innerWidth);
+    pdf.text(subLines, innerLeft, cursorY + 2);
+    cursorY += 2 + subLines.length * 4.2;
   }
 
-  // Mini-pílulas Inc/Req no rodapé
+  // Linha de delta (apenas onde a comparação faz sentido)
+  if (c.delta !== undefined && c.delta !== null && Number.isFinite(c.delta)) {
+    cursorY += 2;
+    const isFlat = c.delta === 0;
+    const isUp = c.delta > 0;
+    const isGood = isFlat ? null : c.deltaInverse ? !isUp : isUp;
+    const tone: RGB = isFlat ? BRAND.slate : isGood ? BRAND.green : BRAND.red;
+
+    const { text } = formatDeltaText(c.delta);
+    const fullText = `${text} vs período anterior`;
+
+    // pílula colorida fina
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(7.5);
+    const txtW = pdf.getTextWidth(fullText);
+    const padX = 3;
+    const padY = 1.4;
+    const pillH = 4.6;
+    const pillW = Math.min(innerWidth, txtW + padX * 2);
+
+    setFill(pdf, tone);
+    pdf.roundedRect(innerLeft, cursorY, pillW, pillH, 1.4, 1.4, 'F');
+    setColor(pdf, BRAND.white);
+    pdf.text(fullText, innerLeft + pillW / 2, cursorY + pillH - padY, { align: 'center' });
+
+    cursorY += pillH + 1.5;
+
+    // Sub-explicação
+    setColor(pdf, BRAND.muted);
+    pdf.setFont('helvetica', 'italic');
+    pdf.setFontSize(6.4);
+    pdf.text(
+      'compara com periodo anterior de mesma duracao',
+      innerLeft,
+      cursorY + 2
+    );
+    cursorY += 4;
+  }
+
+  // Mini-pílulas Incidente / Requisição no rodapé do card
   if (c.typeBreakdown) {
-    drawTypePillsInline(pdf, innerLeft, y + h - 4.5, c.typeBreakdown);
+    const pillsY = Math.min(y + h - 6, Math.max(cursorY + 2, y + h - 6));
+    drawTypePillsInline(pdf, innerLeft, pillsY, c.typeBreakdown, innerWidth);
   }
 }
 
@@ -850,7 +867,7 @@ function drawTypeBreakdownSection(
     const stats = [
       { label: 'em aberto', value: String(b.open), color: BRAND.amber },
       { label: 'parados', value: String(b.stale), color: b.stale > 0 ? BRAND.red : BRAND.green },
-      { label: 'taxa resol.', value: `${closure}%`, color: BRAND.green },
+      { label: 'resolucao', value: `${closure}%`, color: BRAND.green },
     ];
 
     const statW = (colW - 12) / stats.length;
@@ -1006,19 +1023,20 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   // Legenda didática explicando as %
   y = drawDidacticLegend(pdf, y);
 
-  // KPIs grid (3 colunas × 2 linhas) — altura maior pra acomodar 3 linhas de subtítulo
-  const kpiW = (PAGE.w - PAGE.margin * 2 - 4 * 2) / 3;
-  const kpiH = 38;
+  // KPIs grid (3 colunas × 2 linhas) — altura maior pra acomodar
+  // 3 linhas de subtítulo + delta + pílulas Inc/Req com texto completo
+  const kpiW = (PAGE.w - PAGE.margin * 2 - 5 * 2) / 3;
+  const kpiH = 48;
   const cards = buildKpiCards(input);
 
   for (let i = 0; i < cards.length; i++) {
     const col = i % 3;
     const row = Math.floor(i / 3);
-    const cx = PAGE.margin + col * (kpiW + 4);
-    const cy = y + row * (kpiH + 4);
+    const cx = PAGE.margin + col * (kpiW + 5);
+    const cy = y + row * (kpiH + 5);
     drawKpiCard(pdf, cx, cy, kpiW, kpiH, cards[i]);
   }
-  y += kpiH * 2 + 4 + 7;
+  y += kpiH * 2 + 5 + 8;
 
   // Quebra para a próxima página se vai ficar apertado
   if (y > PAGE.h - 75) {
@@ -1119,14 +1137,20 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
   const m = input.metrics;
   const d = input.delta?.deltas;
 
+  // IMPORTANTE: só passamos `delta` em KPIs onde comparar com o período
+  // anterior é informativo (Total e Taxa de Resolução). Os demais KPIs
+  // são *snapshots* (em aberto, parados, média de horas, saldo) — comparar
+  // 7 chamados parados hoje com 1 chamado de uma semana atrás vira "+600%"
+  // e não ajuda a tomar decisão. Mantemos só o número.
   return [
     {
       title: 'Total de Chamados',
       value: m.total.toLocaleString('pt-BR'),
-      subtitle: `${m.inProgress} em atendimento`,
+      subtitle: `${m.inProgress} em atendimento agora`,
       typeBreakdown: m.totalByType,
       color: BRAND.navy,
       delta: d?.total ?? null,
+      deltaInverse: false,
     },
     {
       title: 'Taxa de Resolução',
@@ -1142,7 +1166,7 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
         {
           value: String(m.inProgress),
           label: 'em atendimento',
-          hint: 'na nossa mão',
+          hint: 'na nossa mao',
         },
         {
           value: String(m.pending),
@@ -1157,27 +1181,25 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
       ],
       typeBreakdown: m.openByType,
       color: BRAND.amber,
-      delta: d?.open ?? null,
-      deltaInverse: true,
+      // sem delta — KPI snapshot
     },
     {
       title: 'Chamados Parados',
       value: m.staleCount.toLocaleString('pt-BR'),
       subtitle:
         m.staleCount === 0
-          ? `Nenhum > ${m.staleThresholdDays}d`
-          : `Media ${m.avgDaysOpen.toFixed(1)}d (limite ${m.staleThresholdDays}d)`,
+          ? `Nenhum acima de ${m.staleThresholdDays} dias`
+          : `Media ${m.avgDaysOpen.toFixed(1)}d em aberto (limite ${m.staleThresholdDays}d)`,
       typeBreakdown: m.staleCount > 0 ? m.staleByType : undefined,
       color: m.staleCount > 0 ? BRAND.red : BRAND.green,
-      delta: d?.staleCount ?? null,
-      deltaInverse: true,
+      // sem delta — KPI snapshot
     },
     {
       title: 'Media de Horas',
       value: `${m.avgWorkHours.toFixed(1)}h`,
-      subtitle: `${m.totalRealizedHours.toFixed(1)}h realizadas`,
+      subtitle: `${m.totalRealizedHours.toFixed(1)}h realizadas no periodo`,
       color: BRAND.blue,
-      delta: d?.avgWorkHours ?? null,
+      // sem delta — média varia muito com sample pequeno
     },
     {
       title:
@@ -1189,9 +1211,9 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
       value: `${Math.abs(m.hoursBalance).toFixed(1)}h`,
       subtitle:
         m.hoursBalanceType === 'gain'
-          ? 'Realizado abaixo do planejado'
+          ? 'Horas economizadas vs planejado'
           : m.hoursBalanceType === 'loss'
-            ? 'Realizado acima do planejado'
+            ? 'Horas realizadas acima do planejado'
             : 'Realizado igual ao planejado',
       color:
         m.hoursBalanceType === 'loss'
