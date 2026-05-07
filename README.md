@@ -1,277 +1,377 @@
-<p align="center">
-  <img src="https://minervafoods.com/wp-content/uploads/2024/08/logo-1920x846.webp" alt="Minerva Foods" width="300"/>
-</p>
+<div align="center">
 
-<h1 align="center">Central de Monitoramento de Chamados RPA</h1>
+<img src="https://minervafoods.com/wp-content/uploads/2024/08/logo-1920x846.webp" alt="Minerva Foods" width="280"/>
 
-<p align="center">
-  <strong>Dashboard de Gestão e Monitoramento de Chamados para a equipe de RPA da Minerva Foods</strong>
-</p>
+# Central de Monitoramento de Chamados RPA
 
-<p align="center">
-  <img src="https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react" alt="React"/>
-  <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript" alt="TypeScript"/>
-  <img src="https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite" alt="Vite"/>
-  <img src="https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=flat-square&logo=tailwindcss" alt="TailwindCSS"/>
-  <img src="https://img.shields.io/badge/TanStack_Query-5-FF4154?style=flat-square&logo=reactquery" alt="TanStack Query"/>
-  <img src="https://img.shields.io/badge/Recharts-3.7-FF6384?style=flat-square" alt="Recharts"/>
-  <img src="https://img.shields.io/badge/Zod-3-3068B7?style=flat-square" alt="Zod"/>
-  <img src="https://img.shields.io/badge/PWA-Ready-5A0FC8?style=flat-square&logo=pwa" alt="PWA"/>
-  <img src="https://img.shields.io/badge/ExcelJS-4.4-217346?style=flat-square&logo=microsoftexcel" alt="ExcelJS"/>
-</p>
+**Dashboard analítico em tempo real para a fila de chamados da equipe de RPA da Minerva Foods.**
+Conectado direto à API do GLPI, com KPIs, insights, ações sugeridas, exportações executivas e modo TV para painel de parede.
 
-<p align="center">
-  <a href="https://github.com/LeviCury/central-monitoramento-chamados-rpa">
-    <img src="https://img.shields.io/badge/GitHub-Repositório-181717?style=flat-square&logo=github" alt="GitHub"/>
-  </a>
-</p>
+<br/>
 
----
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![TanStack Query](https://img.shields.io/badge/TanStack_Query-5.59-FF4154?style=flat-square&logo=reactquery&logoColor=white)](https://tanstack.com/query)
+[![Recharts](https://img.shields.io/badge/Recharts-3.7-FF6384?style=flat-square)](https://recharts.org/)
+[![Zod](https://img.shields.io/badge/Zod-3.23-3068B7?style=flat-square)](https://zod.dev/)
+[![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?style=flat-square&logo=pwa&logoColor=white)](https://web.dev/learn/pwa/)
+[![ExcelJS](https://img.shields.io/badge/ExcelJS-4.4-217346?style=flat-square&logo=microsoftexcel&logoColor=white)](https://github.com/exceljs/exceljs)
+[![jsPDF](https://img.shields.io/badge/jsPDF-2-E63946?style=flat-square)](https://github.com/parallax/jsPDF)
 
-## 📋 Índice
+[![License](https://img.shields.io/badge/license-Internal-B8860B?style=flat-square)](#-licença)
+[![Status](https://img.shields.io/badge/status-em%20produção-2EA043?style=flat-square)](#)
+[![GitHub](https://img.shields.io/badge/GitHub-LeviCury-181717?style=flat-square&logo=github&logoColor=white)](https://github.com/LeviCury/central-monitoramento-chamados-rpa)
 
-- [Sobre o Projeto](#-sobre-o-projeto)
-- [Funcionalidades](#-funcionalidades)
-- [Screenshots](#-screenshots)
-- [Tecnologias Utilizadas](#-tecnologias-utilizadas)
-- [Estrutura do Projeto](#-estrutura-do-projeto)
-- [Pré-requisitos](#-pré-requisitos)
-- [Instalação e Configuração](#-instalação-e-configuração)
-- [Variáveis de Ambiente](#-variáveis-de-ambiente)
-- [Executando o Projeto](#-executando-o-projeto)
-- [Deploy](#-deploy)
-- [Integração com GLPI](#-integração-com-glpi)
-- [Componentes](#-componentes)
-- [Serviços](#-serviços)
-- [Paleta de Cores](#-paleta-de-cores)
-- [Desenvolvedores](#-desenvolvedores)
-- [Licença](#-licença)
+</div>
 
 ---
 
-## 🎯 Sobre o Projeto
+## Sobre
 
-A **Central de Monitoramento de Chamados RPA** é um dashboard web desenvolvido para visualização, gestão e monitoramento dos chamados de suporte da equipe de RPA (Robotic Process Automation) da Minerva Foods. 
+Painel web que substitui planilhas e relatórios manuais. Lê tickets do **GLPI** em tempo real, calcula KPIs, gera **insights automáticos** e **próximas ações**, oferece **comparação lado a lado entre técnicos**, e fecha o ciclo com exportações de **PDF executivo**, **PNG do dashboard** e **Excel multi-abas**. Pensado para três cenários:
 
-O sistema consome dados diretamente da API do **GLPI** (sistema de chamados interno) e apresenta informações através de:
-- Gráficos interativos em tempo real
-- KPIs com atualização automática
-- Filtros dinâmicos e avançados
-- Tabela detalhada com busca e paginação
-- Exportação completa para Excel
-- Tema claro/escuro
-- Modo apresentação para reuniões
+| Persona            | Como usa                                                            |
+| ------------------ | ------------------------------------------------------------------- |
+| **Coordenador**    | Acompanha KPIs do dia, age sobre chamados parados, distribui carga  |
+| **Diretor/Gerente**| Recebe o resumo executivo (1 página, PDF) ou abre o link com filtro |
+| **Time RPA**       | Painel de parede em modo TV rotativo (KPIs ↔ gráficos ↔ heatmap)    |
 
-Este dashboard foi desenvolvido para apresentação a diretores, gerentes e coordenadores, oferecendo uma visão clara e profissional do desempenho da equipe.
+> [!NOTE]
+> O dashboard **não inventa SLA**. Trabalha com indicadores honestos baseados nos dados reais do GLPI: chamados parados, taxa de resolução, planejado vs realizado, etc.
 
 ---
 
-## ✨ Funcionalidades
+## Destaques
 
-### 📊 KPIs (Indicadores de Performance)
+<table>
+<tr>
+<td width="50%" valign="top">
 
-| KPI | Descrição |
-|-----|-----------|
-| **Total de Chamados** | Quantidade total de chamados no período selecionado, com delta % vs período anterior |
-| **Taxa de Resolução** | Percentual de chamados finalizados (fechados + solucionados), com delta vs período anterior |
-| **Chamados em Aberto** | Soma de em atendimento + pendentes + novos, com delta vs período anterior |
-| **Chamados Parados** | Quantidade de chamados em aberto há mais de `VITE_STALE_DAYS` dias (padrão 7), com média de dias em aberto e delta vs período anterior |
-| **Média de Horas** | Média de horas trabalhadas por chamado **com apontamento** |
-| **Saldo de Horas** | Ganho/perda do realizado vs planejado (KPI executivo) |
+### Tempo real, sem fricção
+- Direto na API GLPI (`/search/Ticket`, `/TicketTask`)
+- TanStack Query: cache, dedup, refetch automático
+- Auto-refresh a cada 20 minutos
+- Sem race conditions
 
-> Quando há filtro de data ativo, todos os KPIs principais mostram **comparação com o período anterior equivalente** (delta % colorido).
+</td>
+<td width="50%" valign="top">
 
-### 📈 Gráficos Interativos (com drill-down)
+### Insights e ações
+- Geração automática de insights tonais (positivo / atenção / risco)
+- Lista de "próximas ações" filtráveis com 1 clique
+- Comparação lado a lado de até 4 técnicos
+- Drill-down em qualquer gráfico
 
-- **Evolução de Chamados**: gráfico de área com chamados por dia + **projeção dos próximos 7 dias** (regressão linear)
-- **Planejado x Realizado**: barras agrupadas por colaborador RPA
-- **Distribuição por Status**: barras com quantidade por status — **clique na barra ou na legenda para filtrar**
-- **Chamados por Técnico**: ranking horizontal — **clique na barra para filtrar pelo técnico**
-- **Heatmap de Aberturas**: mapa de calor dia-da-semana × hora para identificar picos de demanda
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
 
-### 🔍 Filtros Avançados
+### Saídas executivas
+- **PDF Resumo Executivo** (1 página, programático)
+- **PNG/PDF Snapshot** do dashboard
+- **Excel** com 4 abas (Resumo, Por Técnico, Por Status, Insights & Ações)
+- Copiar imagem para a área de transferência
 
-- **Período**: filtros rápidos (Hoje, 7d, 30d, este/último mês) + datas manuais
-- **Status**, **Prioridade** e **Técnico**: seleção múltipla
-- **Drill-down**: clique em qualquer gráfico para aplicar/remover filtro
-- **URL compartilhável**: filtros viram query params (`?start=...&status=Pendente`)
-- **Presets em localStorage**: salve combinações de filtros nomeadas e reaplique com 1 clique
+</td>
+<td width="50%" valign="top">
 
-### ⏰ Tempo em aberto / Chamados parados
+### Painel de parede
+- Modo apresentação fullscreen (Ctrl+P)
+- **Modo TV**: carrossel rotativo entre KPIs, evolução, planejado vs realizado, status, técnicos e heatmap
+- Tema claro/escuro adaptativo
+- PWA instalável
 
-> O projeto **não inventa SLA**. Em vez disso usa um indicador honesto baseado em dado real: há quantos dias um chamado em aberto está sem ser fechado.
+</td>
+</tr>
+</table>
 
-- Limite configurável (`VITE_STALE_DAYS`, padrão `7` dias)
-- KPI **Chamados Parados**: quantos chamados em aberto passaram do limite, com a média de dias em aberto
-- Badge **"Parado há Xd"** automático na tabela de chamados
+---
 
-### 📋 Tabela de Chamados
+## Quick Start
 
-- Listagem completa com **ordenação clicável por coluna** (ID, título, status, técnico, horas, data)
-- Busca em tempo real por ID, título ou técnico
+```bash
+git clone https://github.com/LeviCury/central-monitoramento-chamados-rpa.git
+cd central-monitoramento-chamados-rpa
+npm install
+cp .env.example .env      # preencha com suas credenciais GLPI
+npm run dev               # http://localhost:5173
+```
+
+> [!TIP]
+> Em 30 segundos você tem um dashboard rodando contra o GLPI. Veja [Variáveis de Ambiente](#variáveis-de-ambiente) para os tokens necessários.
+
+---
+
+## Sumário
+
+- [Sobre](#sobre)
+- [Destaques](#destaques)
+- [Quick Start](#quick-start)
+- [Funcionalidades](#funcionalidades)
+- [Arquitetura](#arquitetura)
+- [Stack](#stack)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Pré-requisitos](#pré-requisitos)
+- [Instalação e Configuração](#instalação-e-configuração)
+- [Variáveis de Ambiente](#variáveis-de-ambiente)
+- [Scripts](#scripts)
+- [Integração com GLPI](#integração-com-glpi)
+- [Saídas do Dashboard](#saídas-do-dashboard)
+- [Modos de Visualização](#modos-de-visualização)
+- [Performance](#performance)
+- [Deploy](#deploy)
+- [Solução de Problemas](#solução-de-problemas)
+- [Roadmap](#roadmap)
+- [Desenvolvedores](#desenvolvedores)
+- [Licença](#licença)
+
+---
+
+## Funcionalidades
+
+### KPIs com comparativo
+
+| KPI                    | O que mede                                                                              |
+| ---------------------- | --------------------------------------------------------------------------------------- |
+| **Total de Chamados**  | Total no período + Δ% vs período anterior equivalente                                   |
+| **Taxa de Resolução**  | (fechados + solucionados) / total + Δ vs período anterior                               |
+| **Chamados em Aberto** | Em atendimento + pendentes + novos + Δ vs período anterior                              |
+| **Chamados Parados**   | Em aberto há mais de `VITE_STALE_DAYS` dias (padrão `7`), com média de dias em aberto   |
+| **Média de Horas**     | Média de horas trabalhadas por chamado **com apontamento**                              |
+| **Saldo de Horas**     | Realizado − Planejado (KPI executivo de capacidade)                                     |
+
+> [!NOTE]
+> Quando há filtro de data ativo, **todos** os KPIs mostram comparativo automático com o período anterior de mesma duração. Os deltas são coloridos por sinal e tom (subir/cair pode ser bom ou ruim dependendo do KPI).
+
+### Insights automáticos e ações sugeridas
+
+Logo abaixo dos KPIs aparece o bloco **"Hoje no RPA"**:
+
+- **Leitura rápida**: 3–5 frases curtas geradas a partir das métricas (ex.: *"Taxa de resolução em alta: +12% em 7 dias"*)
+- **Próximas ações**: lista priorizada com botões "Filtrar →" que aplicam o filtro relevante no painel (ex.: *"3 chamados parados há mais de 7 dias — Filtrar"*)
+
+### Gráficos interativos com drill-down
+
+| Gráfico                       | Comportamento                                                          |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| **Evolução de Chamados**      | Área diária + projeção dos próximos 7 dias (regressão linear)          |
+| **Planejado x Realizado**     | Barras agrupadas por colaborador RPA                                   |
+| **Distribuição por Status**   | Clique na barra ou legenda para filtrar pelo status                    |
+| **Chamados por Técnico**      | Ranking horizontal — clique na barra para filtrar pelo técnico         |
+| **Heatmap dia × hora**        | Identifica picos de demanda na semana                                  |
+
+### Comparador de técnicos
+
+Selecione até 4 técnicos e veja lado a lado:
+
+- Total no período · em aberto · finalizados
+- Taxa de fechamento · chamados parados · média de dias em aberto
+- Horas realizadas · média de horas por chamado
+
+Útil em 1:1, distribuição de carga e revisão de capacidade.
+
+### Filtros avançados
+
+- **Período**: filtros rápidos (Hoje, 7d, 30d, este/último mês) + intervalo manual
+- **Status, Prioridade, Técnico**: seleção múltipla
+- **Drill-down** clicando em qualquer gráfico
+- **URL compartilhável**: filtros viram query params (`?start=...&status=Pendente`) — copie o link e mande no Teams
+- **Presets**: salva combinações nomeadas no `localStorage`, aplica com 1 clique
+- **Multi-grupo**: seletor no header quando há múltiplos grupos configurados (`VITE_GLPI_GROUPS`)
+
+### Tabela com ordenação e ações
+
+- Ordenação clicável por qualquer coluna (ID, título, status, técnico, horas, data)
+- Busca em tempo real (ID, título, técnico)
 - Paginação automática
 - Link direto para o chamado no GLPI
-- Badges de status coloridos + alerta visual de chamados parados e apontamentos pendentes
-- Painel lateral com detalhes do chamado e apontamentos por colaborador
+- Badges de status coloridos
+- **Badge "Parado há Xd"** aparece automaticamente quando o limiar é ultrapassado
+- Painel lateral com detalhes + apontamentos por colaborador
 
-### 🌙 Tema Claro/Escuro
+### Outros recursos
 
-- Alternância entre tema claro e escuro
-- Persistência da preferência no localStorage
-- Detecção automática da preferência do sistema
-- Logos adaptativas para cada tema
-
-### 🎥 Modo Apresentação + Modo TV
-
-- Interface fullscreen otimizada para reuniões (atalho **Ctrl+P**)
-- KPIs em destaque com tamanho ampliado
-- **Modo TV** (atalho **T** dentro da apresentação): slideshow rotativo entre KPIs, Evolução, Planejado x Realizado, Status & Técnicos e Heatmap a cada 12s — perfeito para um monitor fixo na parede da equipe RPA
-- Saída com **Esc**
-
-### 🏷️ Multi-grupo
-
-- Suporte a múltiplos grupos técnicos via `VITE_GLPI_GROUPS=108:RPA|110:Infra|...`
-- Seletor no header (aparece automaticamente quando há mais de um grupo)
-- Preferência persistida em `localStorage`
-
-### 📥 Exportação para Excel
-
-- Relatório executivo com KPIs formatados
-- Planilha completa de chamados
-- Cores e estilos profissionais da marca Minerva
-- Filtros automáticos na planilha
-- Download instantâneo em formato `.xlsx`
-
-### 🔄 Auto-Refresh + Toasts
-
-- Atualização automática via TanStack Query a cada 20 minutos
-- Indicador visual de última atualização ("há 5 minutos", "há 1 hora")
-- Toasts discretos de feedback para refresh, exportação e erros
-- Sem race conditions: requisições obsoletas são descartadas automaticamente
-
-### 📲 PWA (Progressive Web App)
-
-- **Instalável no desktop** (Chrome/Edge: ícone "Instalar" na barra de endereço)
-- Cache automático de assets e fontes para abertura rápida
-- Manifest com ícone mascarável e tema Minerva
+- **Tema claro/escuro** com detecção automática do sistema, persistência em `localStorage` e logos adaptativas
+- **Toaster** discreto para feedback de refresh, exportação e erros
+- **ErrorBoundary** global com tela de fallback elegante
+- **PWA**: instalável no desktop (Chrome/Edge), cache offline de assets, manifest com tema da Minerva
+- **Acessibilidade**: ARIA labels, roles, sort, navegação por teclado nos elementos interativos
+- **Modo apresentação** (Ctrl+P) com KPIs ampliados e **Modo TV** rotativo (atalho **T**)
 
 ---
 
-## 🛠 Tecnologias Utilizadas
+## Arquitetura
 
-### Frontend
+```mermaid
+flowchart LR
+    subgraph Browser["Navegador"]
+        UI["React Components<br/>(Dashboard, Charts, Tables)"]
+        Hooks["Hooks<br/>(filters, drill-down,<br/>presentation)"]
+        Query["TanStack Query<br/>(cache + dedup +<br/>auto-refresh)"]
+    end
 
-| Tecnologia | Versão | Descrição |
-|------------|--------|-----------|
-| **React** | 18.3.1 | Biblioteca para construção de interfaces |
-| **TypeScript** | 5.5.3 | Superset JavaScript com tipagem estática |
-| **Vite** | 5.4.8 | Build tool e dev server ultrarrápido |
-| **TailwindCSS** | 3.4.1 | Framework CSS utilitário |
-| **TanStack Query** | 5.59 | Cache, dedup e refetch das chamadas ao GLPI |
-| **Zod** | 3.23 | Validação runtime das respostas da API |
-| **Recharts** | 3.7 | Biblioteca de gráficos para React |
-| **Lucide React** | 0.344 | Biblioteca de ícones moderna |
-| **ExcelJS** | 4.4 | Geração de arquivos Excel (lazy load) |
-| **FileSaver** | 2.0.5 | Download de arquivos no navegador |
-| **vite-plugin-pwa** | 0.20 | Service worker + manifest PWA |
+    subgraph Services["src/services"]
+        Analytics["analytics.ts<br/>KPIs, insights,<br/>aggregations"]
+        GLPI["glpi/<br/>session · tickets ·<br/>tasks · users · zod"]
+        Excel["excelExport.ts<br/>(lazy)"]
+        Snap["snapshotExport.ts<br/>html2canvas + jspdf<br/>(lazy)"]
+    end
+
+    subgraph External["GLPI REST API"]
+        S["/initSession"]
+        T["/search/Ticket"]
+        U["/User/{id}"]
+        TT["/Ticket/{id}/TicketTask"]
+    end
+
+    UI --> Hooks
+    Hooks --> Query
+    Query --> Analytics
+    Analytics --> GLPI
+    GLPI -. via Vite proxy .-> S
+    GLPI --> T
+    GLPI --> U
+    GLPI --> TT
+    UI -. exporta .-> Excel
+    UI -. captura .-> Snap
+```
+
+### Fluxo de dados
+
+1. **Filtros do usuário** → `useDashboardFilters` (sincroniza com URL e `localStorage`)
+2. **`useGLPITickets`** dispara `fetchTickets()` via TanStack Query (cache, dedup, auto-refresh)
+3. **`fetchTickets()`** monta os critérios e chama `glpi/tickets.ts` → `POST /search/Ticket`
+4. **`glpi/tasks.ts`** busca apontamentos em paralelo (`/Ticket/{id}/TicketTask`) e separa por colaborador RPA da allowlist
+5. **`analytics.ts`** calcula métricas, insights, ações, comparativo de período anterior, heatmap, forecast
+6. **Componentes** consomem o estado memoizado e renderizam os gráficos/cards/tabela
+7. **Exportações** (Excel/PNG/PDF) usam módulos lazy carregados sob demanda
+
+---
+
+## Stack
+
+### Runtime
+
+| Tecnologia              | Versão  | Papel                                              |
+| ----------------------- | ------- | -------------------------------------------------- |
+| **React**               | 18.3.1  | UI declarativa                                     |
+| **TypeScript**          | 5.5.3   | Tipagem estática                                   |
+| **Vite**                | 5.4.8   | Build / dev server / proxy GLPI                    |
+| **TailwindCSS**         | 3.4.1   | Estilo utilitário                                  |
+| **TanStack Query**      | 5.59    | Data fetching, cache e dedup                       |
+| **Zod**                 | 3.23    | Validação runtime das respostas do GLPI            |
+| **Recharts**            | 3.7.0   | Gráficos interativos                               |
+| **Lucide React**        | 0.344   | Ícones                                             |
+| **ExcelJS + FileSaver** | 4.4 / 2 | Geração e download de `.xlsx` (lazy)               |
+| **html2canvas**         | 1.4.1   | Snapshot DOM → canvas (lazy)                       |
+| **jsPDF**               | 2       | Geração de PDF (lazy)                              |
+| **vite-plugin-pwa**     | 0.20.5  | Service worker + manifest PWA                      |
 
 ### Desenvolvimento
 
-| Ferramenta | Descrição |
-|------------|-----------|
-| **ESLint** | Linter para qualidade de código |
-| **PostCSS** | Processador CSS |
-| **Autoprefixer** | Prefixos CSS automáticos |
+| Ferramenta             | Para que serve                |
+| ---------------------- | ----------------------------- |
+| **ESLint**             | Lint                          |
+| **TypeScript ESLint**  | Regras TS                     |
+| **PostCSS**            | Pipeline CSS do Tailwind      |
+| **Autoprefixer**       | Prefixos CSS automáticos      |
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 
-```
+```text
 central-monitoramento-chamados-rpa/
 │
-├── 📄 index.html              # HTML principal
-├── 📄 package.json            # Dependências e scripts
-├── 📄 vite.config.ts          # Vite + proxy GLPI + PWA
-├── 📄 tailwind.config.js      # TailwindCSS
-├── 📄 tsconfig.json           # TypeScript
-├── 📄 .env.example            # Exemplo de variáveis de ambiente
+├── index.html                    # HTML principal
+├── package.json
+├── vite.config.ts                # Vite + proxy GLPI + PWA
+├── tailwind.config.js
+├── tsconfig.json
+├── .env.example
 │
-├── 📂 public/
-│   ├── 📄 favicon.png
-│   └── 📂 icons/
-│       └── 📄 icon.svg        # Ícone PWA mascarável
+├── public/
+│   ├── favicon.png
+│   └── icons/
+│       └── icon.svg              # Ícone PWA mascarável
 │
-└── 📂 src/
+└── src/
+    ├── main.tsx                  # QueryClientProvider + ErrorBoundary + Toaster
+    ├── App.tsx                   # ThemeProvider
+    ├── config.ts                 # Variáveis de ambiente tipadas
+    ├── index.css
     │
-    ├── 📄 main.tsx            # Entry point: QueryClientProvider + ErrorBoundary + Toaster
-    ├── 📄 App.tsx             # Wrap com ThemeProvider
-    ├── 📄 config.ts           # Configuração tipada (env vars centralizadas)
-    ├── 📄 index.css           # Estilos globais e variáveis CSS
+    ├── components/
+    │   ├── Dashboard.tsx                 # Orquestrador
+    │   ├── DashboardHeader.tsx           # Cabeçalho + multi-grupo + ações
+    │   ├── KPICard.tsx · KPIGrid.tsx     # Cards e grid responsivo de KPIs
+    │   ├── InsightsBlock.tsx             # "Hoje no RPA": insights + ações
+    │   ├── TimelineChart.tsx             # Evolução + forecast 7 dias
+    │   ├── PlannedVsRealizedChart.tsx
+    │   ├── StatusChart.tsx               # com drill-down
+    │   ├── TechnicianChart.tsx           # com drill-down
+    │   ├── Heatmap.tsx                   # dia × hora
+    │   ├── TechniciansCompare.tsx        # comparador lado a lado
+    │   ├── TicketTable.tsx               # ordenação + badge "parado há Xd"
+    │   ├── TicketDetailPanel.tsx         # painel lateral
+    │   ├── TicketFilterPanel.tsx
+    │   ├── PresetsBar.tsx                # salvar/aplicar presets
+    │   ├── PresentationCarousel.tsx      # modo TV
+    │   ├── ShareMenu.tsx                 # PDF executivo · PNG · PDF · copiar
+    │   ├── ErrorBoundary.tsx
+    │   └── Toaster.tsx
     │
-    ├── 📂 components/
-    │   ├── 📄 Dashboard.tsx              # Orquestrador
-    │   ├── 📄 DashboardHeader.tsx        # Cabeçalho + multi-grupo + ações
-    │   ├── 📄 KPICard.tsx · KPIGrid.tsx  # Cards e grid de KPIs com deltas
-    │   ├── 📄 TimelineChart.tsx          # Evolução + forecast 7 dias
-    │   ├── 📄 PlannedVsRealizedChart.tsx # Planejado vs Realizado
-    │   ├── 📄 StatusChart.tsx            # Status com drill-down
-    │   ├── 📄 TechnicianChart.tsx        # Técnicos com drill-down
-    │   ├── 📄 Heatmap.tsx                # Mapa de calor dia × hora
-    │   ├── 📄 TicketTable.tsx            # Tabela com ordenação + badge "parado há Xd"
-    │   ├── 📄 TicketDetailPanel.tsx      # Painel lateral
-    │   ├── 📄 TicketFilterPanel.tsx      # Filtros (período/status/prio/técnico)
-    │   ├── 📄 PresetsBar.tsx             # Salvar/aplicar presets
-    │   ├── 📄 PresentationCarousel.tsx   # Modo TV (slideshow)
-    │   ├── 📄 ErrorBoundary.tsx          # Fallback de crash global
-    │   └── 📄 Toaster.tsx                # Toasts de feedback
+    ├── hooks/
+    │   ├── useGLPITickets.ts             # TanStack Query (tickets + horas)
+    │   ├── useDashboardFilters.ts        # filtros + URL + presets + multi-grupo
+    │   ├── usePresentationMode.ts        # fullscreen + modo TV + atalhos
+    │   ├── useTimeAgo.ts                 # "há X minutos"
+    │   ├── useDrillDown.ts               # cliques nos gráficos → filtros
+    │   └── useToasts.ts
     │
-    ├── 📂 hooks/
-    │   ├── 📄 useGLPITickets.ts          # TanStack Query (tickets + horas)
-    │   ├── 📄 useDashboardFilters.ts     # Filtros + URL + presets + multi-grupo
-    │   ├── 📄 usePresentationMode.ts     # Fullscreen + atalhos + modo TV
-    │   ├── 📄 useTimeAgo.ts              # "há X minutos"
-    │   ├── 📄 useDrillDown.ts            # Cliques nos gráficos
-    │   └── 📄 useToasts.ts               # Sistema de toasts
+    ├── contexts/
+    │   ├── ThemeContext.tsx              # provider claro/escuro
+    │   └── useTheme.ts
     │
-    ├── 📂 contexts/
-    │   ├── 📄 ThemeContext.tsx           # Provider claro/escuro
-    │   └── 📄 useTheme.ts                # Hook do contexto
+    ├── services/
+    │   ├── analytics.ts                  # métricas, parados, forecast,
+    │   │                                 # deltas, heatmap, insights, ações
+    │   ├── excelExport.ts                # Excel multi-abas (lazy)
+    │   ├── snapshotExport.ts             # PNG / PDF snapshot / PDF executivo (lazy)
+    │   │
+    │   └── glpi/                         # Cliente GLPI modular
+    │       ├── index.ts                  # barrel
+    │       ├── session.ts                # initSession + glpiFetch + 401 retry
+    │       ├── tickets.ts                # /search/Ticket + critérios
+    │       ├── tasks.ts                  # /TicketTask + apontamentos
+    │       ├── users.ts                  # /User + allowlist colaboradores RPA
+    │       ├── constants.ts              # FIELDS, STATUS_MAP, PRIORITY_MAP
+    │       └── schemas.ts                # Validação Zod das respostas
     │
-    ├── 📂 services/
-    │   ├── 📄 analytics.ts               # Agregações, métricas, chamados parados, forecast, deltas, heatmap
-    │   ├── 📄 excelExport.ts             # Exportação Excel (lazy)
-    │   └── 📂 glpi/                      # Cliente GLPI modular
-    │       ├── 📄 index.ts               # Barrel
-    │       ├── 📄 session.ts             # initSession / glpiFetch
-    │       ├── 📄 users.ts               # Usuários + allowlist colaboradores
-    │       ├── 📄 tickets.ts             # Search Tickets
-    │       ├── 📄 tasks.ts               # TicketTask (apontamentos)
-    │       ├── 📄 constants.ts           # FIELDS, STATUS_MAP, PRIORITY_MAP
-    │       └── 📄 schemas.ts             # Validação Zod
+    ├── types/
+    │   └── index.ts                      # Ticket, FilterState, etc.
     │
-    ├── 📂 types/
-    │   └── 📄 index.ts                   # Ticket, FilterState, etc.
-    │
-    └── 📂 utils/
-        └── 📄 timeFormat.ts              # formatHoursMinutes
+    └── utils/
+        └── timeFormat.ts                 # formatHoursMinutes
 ```
 
 ---
 
-## 📋 Pré-requisitos
+## Pré-requisitos
 
-Antes de começar, você precisará ter instalado:
-
-- **Node.js** (versão 18 ou superior)
+- **Node.js** 18 ou superior
 - **npm** ou **yarn**
-- Acesso à rede interna da Minerva Foods (para API GLPI)
+- Acesso à rede interna da Minerva Foods (ou um proxy ao GLPI)
+- Tokens da API GLPI (`App-Token` + `Authorization Basic`)
 
 ---
 
-## ⚙️ Instalação e Configuração
+## Instalação e Configuração
 
-### 1. Clone o repositório
+### 1. Clone
 
 ```bash
 git clone https://github.com/LeviCury/central-monitoramento-chamados-rpa.git
@@ -284,135 +384,133 @@ cd central-monitoramento-chamados-rpa
 npm install
 ```
 
-### 3. Configure as variáveis de ambiente
+### 3. Configure o `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Edite o arquivo `.env` com suas credenciais (veja seção abaixo).
+Edite o arquivo `.env` com suas credenciais (veja a próxima seção).
 
----
-
-## 🔐 Variáveis de Ambiente
-
-Crie um arquivo `.env` na raiz do projeto (use `.env.example` como base):
-
-```env
-# Credenciais GLPI
-VITE_GLPI_AUTH_BASIC=seu_token_basic_base64
-VITE_GLPI_APP_TOKEN=seu_app_token
-VITE_GLPI_ENTITY_ID=108
-
-# Colaboradores RPA (separados por |, aliases por ,)
-VITE_RPA_COLLABORATORS=Nome Sobrenome|Outro Nome,Variante Do Nome
-
-# Quantos dias um chamado em aberto precisa ficar parado para virar
-# "Chamado Parado" no KPI/tabela. Padrão: 7.
-VITE_STALE_DAYS=7
-
-# Multi-grupo: id:nome|id:nome (primeiro = padrão)
-VITE_GLPI_GROUPS=108:RPA|110:Infra
-```
-
-| Variável | Descrição |
-|----------|-----------|
-| `VITE_GLPI_AUTH_BASIC` | Token de autenticação em Base64 para criar sessão |
-| `VITE_GLPI_APP_TOKEN` | Token da aplicação registrada no GLPI |
-| `VITE_GLPI_ENTITY_ID` | ID do grupo padrão (ex: 108 = RPA) |
-| `VITE_RPA_COLLABORATORS` | Allowlist de colaboradores cujas tasks são contabilizadas |
-| `VITE_STALE_DAYS` | Limite (em dias) para classificar um chamado em aberto como "parado" (padrão `7`) |
-| `VITE_GLPI_GROUPS` | Lista de grupos disponíveis no seletor multi-grupo |
-
-> ⚠️ **Importante**: Nunca commite o arquivo `.env` no repositório!
->
-> 🔐 **Segurança**: como variáveis `VITE_*` são embutidas no bundle, qualquer usuário com acesso ao site público lê suas credenciais GLPI. Em produção exposta externamente, considere um backend proxy que mantenha as credenciais server-side.
-
----
-
-## 🚀 Executando o Projeto
-
-### Modo Desenvolvimento
+### 4. Rode
 
 ```bash
 npm run dev
 ```
 
-O servidor iniciará em `http://localhost:5173`
-
-### Build de Produção
-
-```bash
-npm run build
-```
-
-Os arquivos serão gerados na pasta `dist/`
-
-### Preview da Build
-
-```bash
-npm run preview
-```
-
-### Verificar Tipos TypeScript
-
-```bash
-npm run typecheck
-```
+Abra `http://localhost:5173`.
 
 ---
 
-## 🌐 Deploy
+## Variáveis de Ambiente
 
-O projeto pode ser implantado em diversas plataformas gratuitas:
+```env
+# === Credenciais GLPI ===
+VITE_GLPI_AUTH_BASIC=base64(usuario:senha)
+VITE_GLPI_APP_TOKEN=seu_app_token_aqui
 
-| Plataforma | Descrição |
-|------------|-----------|
-| **Vercel** | Recomendado - Integração direta com GitHub |
-| **Netlify** | Alternativa fácil de configurar |
-| **GitHub Pages** | Gratuito para repositórios públicos |
-| **Cloudflare Pages** | Muito rápido e gratuito |
+# === Filtros de fila ===
+# Entidade GLPI (campo 80). DEIXE VAZIO se você só quer filtrar por grupo
+# (caso comum: o ID que você conhece é o do grupo técnico, não da entidade).
+VITE_GLPI_ENTITY_ID=
 
-### Deploy no Vercel
+# Grupo técnico GLPI (campo 8). É o ID do "RPA" no GLPI.
+VITE_GLPI_GROUP_ID=108
 
-1. Acesse [vercel.com](https://vercel.com) e faça login com GitHub
-2. Importe o repositório
-3. Configure as variáveis de ambiente
-4. Clique em Deploy
+# Lista de grupos disponíveis no seletor multi-grupo (id:nome|id:nome).
+# O primeiro é o padrão.
+VITE_GLPI_GROUPS=108:RPA
 
-> ⚠️ **Nota sobre CORS**: Em produção, a API GLPI precisa permitir requisições do domínio do deploy.
+# === Equipe RPA ===
+# Apontamentos só são contabilizados se o autor estiver nesta lista.
+# Sintaxe: "Nome Canônico,Alias 1,Alias 2|Outro Nome".
+VITE_RPA_COLLABORATORS=Nome Sobrenome|Outro Nome,Variante Do Nome
+
+# === Indicadores ===
+# Quantos dias em aberto um chamado precisa para virar "Chamado Parado".
+VITE_STALE_DAYS=7
+```
+
+| Variável                  | Obrigatória | Descrição                                                                                                       |
+| ------------------------- | :---------: | --------------------------------------------------------------------------------------------------------------- |
+| `VITE_GLPI_AUTH_BASIC`    |     Sim     | Token Basic em Base64 (`base64(usuario:senha)`) para criar sessão no GLPI                                        |
+| `VITE_GLPI_APP_TOKEN`     |     Sim     | App-Token gerado em *GLPI → Configurar → Geral → API*                                                            |
+| `VITE_GLPI_GROUP_ID`      |     Não     | ID do grupo técnico (campo 8). Padrão `108` (RPA). Use `under` no GLPI: pega o grupo e seus subgrupos             |
+| `VITE_GLPI_ENTITY_ID`     |     Não     | ID da entidade (campo 80). Vazio = não filtrar por entidade. Útil quando o GLPI separa por unidade organizacional|
+| `VITE_GLPI_GROUPS`        |     Não     | `id:nome|id:nome|...` para o seletor multi-grupo. O primeiro vira default                                        |
+| `VITE_RPA_COLLABORATORS`  |     Não     | Allowlist de colaboradores cujas tasks são contabilizadas. Aliases por vírgula                                   |
+| `VITE_STALE_DAYS`         |     Não     | Limite (em dias) para classificar um chamado em aberto como "parado". Padrão `7`                                  |
+
+> [!WARNING]
+> **Nunca commite o `.env`.** Ele já está no `.gitignore`. As variáveis `VITE_*` são embutidas no bundle final, então qualquer pessoa com acesso ao site lê os tokens. Em produção exposta externamente, considere um proxy backend que mantenha as credenciais server-side.
+
+> [!TIP]
+> Se o número total de chamados aparecer muito alto (ex.: bate em 2.001), o filtro de fila não está casando.
+> Veja [Solução de Problemas](#solução-de-problemas).
 
 ---
 
-## 🔌 Integração com GLPI
+## Scripts
 
-### Endpoints Utilizados
+| Comando               | O que faz                                                |
+| --------------------- | -------------------------------------------------------- |
+| `npm run dev`         | Sobe o dev server em `http://localhost:5173` com HMR     |
+| `npm run build`       | Build de produção em `dist/`                             |
+| `npm run preview`     | Servidor local servindo o `dist/`                        |
+| `npm run lint`        | ESLint em todo o projeto                                 |
+| `npm run typecheck`   | `tsc --noEmit` (não emite arquivos, só verifica tipos)   |
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/initSession` | Cria uma sessão e retorna `session_token` |
-| `POST` | `/search/Ticket` | Busca chamados com critérios |
-| `GET` | `/User/{id}` | Obtém dados do usuário/técnico |
-| `GET` | `/Ticket/{id}/TicketTask` | Obtém tarefas do chamado (horas trabalhadas) |
+---
 
-### Fluxo de Autenticação
+## Integração com GLPI
 
-```
+### Endpoints utilizados
+
+| Método | Endpoint                       | Para quê                                          |
+| :----: | ------------------------------ | ------------------------------------------------- |
+| `GET`  | `/initSession`                 | Cria sessão e devolve `session_token`             |
+| `POST` | `/search/Ticket`               | Busca chamados com critérios                      |
+| `GET`  | `/User/{id}`                   | Resolve nome do técnico/solicitante               |
+| `GET`  | `/Ticket/{id}/TicketTask`      | Lista apontamentos de horas do chamado            |
+
+### Fluxo de autenticação
+
+```text
 1. GET /initSession
-   Headers: Authorization (Basic), App-Token
-   Response: { session_token: "xxx" }
+   Headers: Authorization: Basic <base64>, App-Token: <token>
+   → { session_token }
 
 2. POST /search/Ticket
    Headers: Session-Token, App-Token
-   Body: { criteria: [...], range: "0-2000" }
+   Body: { criteria: [...], range: "0-2000", forcedisplay: [...] }
 ```
 
-### Proxy de Desenvolvimento
+A sessão é cacheada em memória e renovada automaticamente em respostas `401`.
 
-O Vite está configurado para fazer proxy das requisições `/api/glpi` para a API GLPI real, evitando problemas de CORS durante o desenvolvimento.
+### Critérios de busca
 
-```typescript
-// vite.config.ts
+```ts
+{
+  criteria: [
+    // (opcional) entidade — campo 80
+    { link: 'AND', field: 80, searchtype: 'under', value: '108' },
+
+    // grupo técnico — campo 8 — usar `under` em vez de `equals`
+    { link: 'AND', field: 8,  searchtype: 'under', value: '108' },
+
+    // datas, status, prioridade...
+  ]
+}
+```
+
+> [!IMPORTANT]
+> **Use `searchtype: 'under'`** para entidade e grupo. Em algumas instalações do GLPI, `equals` é silenciosamente ignorado e a API devolve o universo inteiro até bater no teto do `range`. Esse foi o bug que fazia o painel mostrar 2.001 chamados em vez dos 756 reais da fila.
+
+### Proxy de desenvolvimento
+
+`vite.config.ts` faz proxy de `/api/glpi/*` para `https://central.minervafoods.com/apirest.php` evitando CORS no dev.
+
+```ts
 server: {
   proxy: {
     '/api/glpi': {
@@ -426,180 +524,231 @@ server: {
 
 ---
 
-## 🧩 Componentes
+## Saídas do Dashboard
 
-### Dashboard.tsx
-Componente principal que orquestra toda a aplicação:
-- Gerenciamento de estado dos filtros
-- Carregamento de dados da API
-- Cálculo de métricas
-- Auto-refresh a cada 20 minutos
-- Controle de tema claro/escuro
-- Modo apresentação
-- Exportação para Excel
+Use o botão **"Compartilhar"** no header. Todas as opções carregam suas dependências sob demanda (`html2canvas`, `jspdf`, `exceljs`).
 
-### TicketFilterPanel.tsx
-Painel lateral com filtros colapsáveis:
-- Período (data inicial/final)
-- Status do chamado
-- Técnico responsável
-- Contador de filtros ativos
+| Saída                       | Formato | Como é gerada                                                              |
+| --------------------------- | ------- | -------------------------------------------------------------------------- |
+| **Resumo Executivo**        | PDF A4  | Programaticamente (jsPDF puro) — KPIs, insights, ações em 1 página         |
+| **Snapshot do Dashboard**   | PNG     | `html2canvas` captura a tela em alta resolução                             |
+| **Snapshot do Dashboard**   | PDF A4  | Mesma captura, embutida em PDF paisagem                                    |
+| **Copiar imagem**           | Clipboard | Copia o PNG para a área de transferência (cola direto no Teams/email)    |
+| **Excel completo**          | XLSX    | 4 abas — Resumo, Por Técnico, Por Status, Insights & Ações                 |
 
-### TicketKPICard.tsx
-Card reutilizável para exibição de KPIs:
-- Ícone personalizado
-- Título e valor principal
-- Subtítulo informativo
-- Cores personalizáveis (navy, green, amber, red)
-- Animações de entrada
+### Excel — abas geradas
 
-### StatusChart.tsx
-Gráfico de barras verticais com distribuição por status:
-- 🟢 Fechado
-- 🔵 Solucionado
-- 🟣 Novo
-- 🔴 Em Atendimento
-- 🟡 Pendente
-
-### TechnicianChart.tsx
-Gráfico de barras horizontais com ranking dos técnicos:
-- Top 10 técnicos
-- Cores variadas por técnico
-- Tooltip com nome completo
-
-### TimelineChart.tsx
-Gráfico de área mostrando evolução diária:
-- Total no período
-- Média por dia
-- Pico máximo
-
-### TicketTable.tsx
-Tabela completa de chamados:
-- Busca em tempo real
-- Paginação
-- Link direto para GLPI
-- Badges de status coloridos
+| Aba                  | Conteúdo                                                                            |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| **Resumo Executivo** | KPIs principais formatados, com cores e destaques                                   |
+| **Por Técnico**      | Total · em aberto · finalizados · taxa fechamento · parados · média dias · horas    |
+| **Por Status**       | Distribuição por status com totais                                                  |
+| **Insights & Ações** | Insights tonais e lista de próximas ações com severidade                            |
 
 ---
 
-## 🔧 Serviços
+## Modos de Visualização
 
-### glpiApi.ts
-Serviço principal de integração com GLPI:
+### Modo Apresentação
 
-| Função | Descrição |
-|--------|-----------|
-| `createSession()` | Cria sessão na API |
-| `getValidSessionToken()` | Obtém token válido (com cache) |
-| `fetchTicketsFromGLPI()` | Busca chamados com filtros |
-| `fetchUserName()` | Busca nome do usuário por ID |
-| `fetchTicketWorkHours()` | Busca horas apontadas em tarefas |
+Atalho: **Ctrl + P** (sai com **Esc**).
 
-### analytics.ts
-Funções de agregação e cálculo de métricas:
+- Fullscreen
+- KPIs ampliados
+- Tipografia maior
+- Toolbar minimizada
 
-| Função | Descrição |
-|--------|-----------|
-| `fetchTickets()` | Wrapper para buscar tickets |
-| `getTicketMetrics()` | Calcula KPIs (total, taxa, médias) |
-| `aggregateTicketsByStatus()` | Agrupa por status |
-| `aggregateTicketsByTechnician()` | Agrupa por técnico |
-| `aggregateTicketsByDate()` | Agrupa por data |
-| `getUniqueTechnicians()` | Lista técnicos únicos |
-| `getUniqueStatuses()` | Lista status únicos |
-| `fetchWorkHoursForTickets()` | Busca horas trabalhadas em lote |
+### Modo TV (carrossel)
 
-### excelExport.ts
-Exportação de relatórios para Excel:
+Dentro da apresentação, atalho: **T**.
 
-| Função | Descrição |
-|--------|-----------|
-| `exportToExcel()` | Gera relatório Excel completo |
+Slideshow rotativo a cada 12 segundos:
 
-O relatório inclui:
-- **Planilha "Resumo Executivo"**: KPIs formatados, detalhamento por status
-- **Planilha "Chamados"**: Lista completa com filtros automáticos
-
----
-
-## 🎨 Paleta de Cores
-
-O dashboard utiliza as cores oficiais da Minerva Foods:
-
-| Cor | Hex | Uso |
-|-----|-----|-----|
-| **Navy** | `#1D2E40` | Header, textos principais, gráficos |
-| **Navy Light** | `#2a4158` | Gradientes, hovers |
-| **Red** | `#F84454` | Destaques, alertas, CTAs |
-| **Red Light** | `#ff6b78` | Hovers, variações |
-| **Branco** | `#FFFFFF` | Backgrounds, cards |
-
-### Logos
-
-| Contexto | Logo |
-|----------|------|
-| Fundo escuro (header, loading) | Logo branca SVG |
-| Fundo claro (footer) | Logo colorida |
-
-### Variáveis CSS
-
-```css
-:root {
-  --minerva-navy: #1D2E40;
-  --minerva-red: #F84454;
-  --minerva-white: #FFFFFF;
-  --minerva-navy-light: #2a4158;
-  --minerva-navy-dark: #152231;
-  --minerva-red-light: #ff6b78;
-  --minerva-red-dark: #d63644;
-}
+```
+KPIs → Evolução → Planejado x Realizado → Status & Técnicos → Heatmap → KPIs ...
 ```
 
+Perfeito para um monitor fixo na parede da equipe.
+
+### PWA
+
+No Chrome/Edge aparece o ícone "Instalar" na barra de endereço. Instalado, abre como app nativo, com cache offline de assets e fontes.
+
 ---
 
-## 👨‍💻 Desenvolvedores
+## Performance
+
+| Item                                | Valor                                                              |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| **Bundle inicial (gzip)**           | ~213 KB (chunk principal) + 7,5 KB (CSS)                            |
+| **Lazy chunks**                     | `excelExport` (~275 KB gz), `snapshotExport` (~179 KB gz)           |
+| **Cache de sessão GLPI**            | 30 minutos em memória, com renovação automática em 401              |
+| **Refetch automático**              | A cada 20 minutos (configurável em `config.ui.autoRefreshMinutes`)  |
+| **Dedup de requisições idênticas**  | Garantido pelo TanStack Query                                       |
+
+> [!NOTE]
+> A primeira interação com Excel/PDF/PNG demora ~300 ms a mais (download do chunk lazy). Depois disso, fica em cache.
+
+---
+
+## Deploy
+
+| Plataforma            | Recomendação                                                              |
+| --------------------- | ------------------------------------------------------------------------- |
+| **Vercel**            | Recomendado — integração direta com GitHub, build automático em cada push |
+| **Netlify**           | Igualmente simples, com configuração via UI                               |
+| **Cloudflare Pages**  | Muito rápido e gratuito                                                   |
+| **GitHub Pages**      | Funciona, mas exige base path configurado                                 |
+| **IIS / nginx**       | Para deploy interno na Minerva — sirva o `dist/` como SPA fallback        |
+
+### Deploy no Vercel em 4 cliques
+
+1. Acesse [vercel.com](https://vercel.com) e logue com GitHub
+2. *Import Project* → selecione o repositório
+3. Configure as variáveis de ambiente (`VITE_GLPI_*`, etc.) em *Settings → Environment Variables*
+4. *Deploy*
+
+> [!WARNING]
+> **CORS em produção**: a API GLPI precisa permitir requisições do domínio do deploy. Se isso não for possível, mantenha o painel atrás da rede interna ou implante um proxy backend.
+
+---
+
+## Solução de Problemas
+
+<details>
+<summary><b>O painel mostra 2.001 chamados em vez dos ~756 do RPA</b></summary>
+<br/>
+
+O filtro de fila não está casando — o GLPI está devolvendo o universo até bater o teto do `range`.
+
+**Diagnóstico**: abra o DevTools → Console e procure por:
+
+```
+[GLPI] Buscando tickets com critérios: { ... }
+[GLPI] Atenção: 2001 tickets retornados ...
+```
+
+**Causas comuns:**
+
+1. `searchtype: 'equals'` está sendo ignorado pelo seu GLPI → use `'under'` (já é o padrão atual)
+2. `VITE_GLPI_GROUP_ID` aponta para um ID inexistente
+3. `VITE_GLPI_ENTITY_ID` está preenchido com um ID que não é entidade → deixe **vazio** se você só conhece o ID do grupo
+
+</details>
+
+<details>
+<summary><b>Erro de CORS em produção</b></summary>
+<br/>
+
+A API GLPI bloqueia requisições do domínio. Soluções:
+
+1. **Configurar CORS no GLPI** para aceitar o domínio do deploy
+2. **Implantar atrás de um proxy** (nginx, Cloudflare Worker) que adicione os headers
+3. **Manter na rede interna** com acesso direto à API
+
+</details>
+
+<details>
+<summary><b>Sessão GLPI expira o tempo todo</b></summary>
+<br/>
+
+A duração padrão é 30 minutos (em memória). Se o seu GLPI expira antes, ajuste em `src/config.ts`:
+
+```ts
+sessionDurationMs: 15 * 60 * 1000  // 15 minutos
+```
+
+A renovação acontece automaticamente em respostas `401`.
+
+</details>
+
+<details>
+<summary><b>Apontamentos de um colaborador não aparecem</b></summary>
+<br/>
+
+Verifique se o nome dele está em `VITE_RPA_COLLABORATORS`. A normalização ignora acentos, capitalização e espaços, mas variantes precisam estar como aliases:
+
+```env
+VITE_RPA_COLLABORATORS=João da Silva,Joao Silva,J. Silva|Maria Souza
+```
+
+</details>
+
+<details>
+<summary><b>O Excel/PDF demora ao primeiro clique</b></summary>
+<br/>
+
+Esperado. Os módulos `exceljs`, `html2canvas` e `jspdf` são carregados sob demanda para reduzir o bundle inicial. Após o primeiro clique fica em cache.
+
+</details>
+
+<details>
+<summary><b>Os deltas de % aparecem com valores enormes (ex.: +1135%)</b></summary>
+<br/>
+
+É matemática real, não bug. Quando o período anterior tem uma base muito pequena (ex.: 1 chamado), qualquer aumento dispara um % alto. O dashboard sempre mostra o número absoluto também — confie nele.
+
+</details>
+
+---
+
+## Roadmap
+
+- [ ] Backend proxy para tirar tokens GLPI do bundle
+- [ ] Webhooks para notificar Teams/Slack quando aparecer chamado parado
+- [ ] Autenticação SSO (Azure AD)
+- [ ] Histórico semanal/mensal persistido para tendências de longo prazo
+- [ ] Painel customizável (drag & drop dos cards)
+- [ ] Exportação agendada (e-mail diário com PDF executivo)
+
+---
+
+## Desenvolvedores
 
 <table>
-  <tr>
-    <td align="center">
-      <a href="https://www.linkedin.com/in/levicury/" target="_blank">
-        <strong>Levi Cury</strong>
-      </a><br/>
-      <sub>Desenvolvedor RPA</sub><br/>
-      <a href="https://www.linkedin.com/in/levicury/" target="_blank">
-        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"/>
-      </a>
-    </td>
-    <td align="center">
-      <a href="https://www.linkedin.com/in/igor-minuncio/" target="_blank">
-        <strong>Igor Martins Minuncio</strong>
-      </a><br/>
-      <sub>Desenvolvedor RPA</sub><br/>
-      <a href="https://www.linkedin.com/in/igor-minuncio/" target="_blank">
-        <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"/>
-      </a>
-    </td>
-  </tr>
+<tr>
+<td align="center" width="50%">
+<a href="https://www.linkedin.com/in/levicury/" target="_blank">
+<strong>Levi Cury</strong>
+</a>
+<br/>
+<sub>Desenvolvedor RPA · Minerva Foods</sub>
+<br/>
+<a href="https://www.linkedin.com/in/levicury/" target="_blank">
+<img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+</a>
+<a href="https://github.com/LeviCury" target="_blank">
+<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=github&logoColor=white" alt="GitHub"/>
+</a>
+</td>
+<td align="center" width="50%">
+<a href="https://www.linkedin.com/in/igor-minuncio/" target="_blank">
+<strong>Igor Martins Minuncio</strong>
+</a>
+<br/>
+<sub>Desenvolvedor RPA · Minerva Foods</sub>
+<br/>
+<a href="https://www.linkedin.com/in/igor-minuncio/" target="_blank">
+<img src="https://img.shields.io/badge/LinkedIn-0077B5?style=flat-square&logo=linkedin&logoColor=white" alt="LinkedIn"/>
+</a>
+</td>
+</tr>
 </table>
 
 ---
 
-## 📄 Licença
+## Licença
 
-Este projeto é de uso interno da **Minerva Foods S.A.**
+Projeto interno da **Minerva Foods S.A.**
 
 © 2026 Minerva Foods S.A. — Todos os direitos reservados.
 
 ---
 
-<p align="center">
-  <strong>Desenvolvido com ❤️ por <a href="https://www.linkedin.com/in/levicury/">Levi Cury</a> e <a href="https://www.linkedin.com/in/igor-minuncio/">Igor Martins Minuncio</a></strong>
-</p>
+<div align="center">
 
-<p align="center">
-  <sub>Equipe de RPA — Minerva Foods</sub>
-</p>
+<img src="https://minervafoods.com/wp-content/uploads/2024/08/logo-1920x846.webp" alt="Minerva Foods" width="160"/>
 
-<p align="center">
-  <img src="https://minervafoods.com/wp-content/uploads/2024/08/logo-1920x846.webp" alt="Minerva Foods" width="150"/>
-</p>
+<sub>Equipe de RPA · Minerva Foods</sub>
+
+</div>
