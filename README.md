@@ -414,12 +414,14 @@ VITE_GLPI_APP_TOKEN=seu_app_token_aqui
 # (caso comum: o ID que você conhece é o do grupo técnico, não da entidade).
 VITE_GLPI_ENTITY_ID=
 
-# Grupo técnico GLPI (campo 8). É o ID do "RPA" no GLPI.
-VITE_GLPI_GROUP_ID= ID_DO_GRUPO
+# Grupo técnico GLPI (campo 8). Coloque aqui o ID do seu grupo no GLPI.
+# Descubra o ID real em: GLPI → Administração → Grupos → passe o mouse
+# sobre o grupo (a URL mostra ?id=NN) ou abra o grupo e veja na URL.
+VITE_GLPI_GROUP_ID=ID_DO_GRUPO
 
 # Lista de grupos disponíveis no seletor multi-grupo (id:nome|id:nome).
-# O primeiro é o padrão.
-VITE_GLPI_GROUPS= ID_DO_GRUPO :RPA
+# O primeiro é o padrão. Os IDs abaixo são fictícios — substitua pelos seus.
+VITE_GLPI_GROUPS=ID_DO_GRUPO:Nome do Grupo|OUTRO_ID:Outro Grupo
 
 # === Equipe RPA ===
 # Apontamentos só são contabilizados se o autor estiver nesta lista.
@@ -435,7 +437,7 @@ VITE_STALE_DAYS=7
 | ------------------------- | :---------: | --------------------------------------------------------------------------------------------------------------- |
 | `VITE_GLPI_AUTH_BASIC`    |     Sim     | Token Basic em Base64 (`base64(usuario:senha)`) para criar sessão no GLPI                                        |
 | `VITE_GLPI_APP_TOKEN`     |     Sim     | App-Token gerado em *GLPI → Configurar → Geral → API*                                                            |
-| `VITE_GLPI_GROUP_ID`      |     Não     | ID do grupo técnico (campo 8). Padrão `ID_DO_GRUPO` (RPA). Use `under` no GLPI: pega o grupo e seus subgrupos             |
+| `VITE_GLPI_GROUP_ID`      |     Não     | ID do grupo técnico (campo 8). Use `under` no GLPI: pega o grupo e seus subgrupos                                |
 | `VITE_GLPI_ENTITY_ID`     |     Não     | ID da entidade (campo 80). Vazio = não filtrar por entidade. Útil quando o GLPI separa por unidade organizacional|
 | `VITE_GLPI_GROUPS`        |     Não     | `id:nome|id:nome|...` para o seletor multi-grupo. O primeiro vira default                                        |
 | `VITE_RPA_COLLABORATORS`  |     Não     | Allowlist de colaboradores cujas tasks são contabilizadas. Aliases por vírgula                                   |
@@ -493,7 +495,7 @@ A sessão é cacheada em memória e renovada automaticamente em respostas `401`.
 {
   criteria: [
     // (opcional) entidade — campo 80
-    { link: 'AND', field: 80, searchtype: 'under', value: 'ID_DO_GRUPO' },
+    { link: 'AND', field: 80, searchtype: 'under', value: 'ID_DA_ENTIDADE' },
 
     // grupo técnico — campo 8 — usar `under` em vez de `equals`
     { link: 'AND', field: 8,  searchtype: 'under', value: 'ID_DO_GRUPO' },
@@ -504,7 +506,7 @@ A sessão é cacheada em memória e renovada automaticamente em respostas `401`.
 ```
 
 > [!IMPORTANT]
-> **Use `searchtype: 'under'`** para entidade e grupo. Em algumas instalações do GLPI, `equals` é silenciosamente ignorado e a API devolve o universo inteiro até bater no teto do `range`. Esse foi o bug que fazia o painel mostrar 2.001 chamados em vez dos 756 reais da fila.
+> **Use `searchtype: 'under'`** para entidade e grupo. Em algumas instalações do GLPI, `equals` é silenciosamente ignorado e a API devolve o universo inteiro até bater no teto do `range` (`0-2000`, ou seja, 2001 itens). Sintoma típico: o número total fica exatamente 2001 mesmo quando a sua fila tem muito menos.
 
 ### Proxy de desenvolvimento
 
@@ -528,13 +530,53 @@ server: {
 
 Use o botão **"Compartilhar"** no header. Todas as opções carregam suas dependências sob demanda (`html2canvas`, `jspdf`, `exceljs`).
 
-| Saída                       | Formato | Como é gerada                                                              |
-| --------------------------- | ------- | -------------------------------------------------------------------------- |
-| **Resumo Executivo**        | PDF A4  | Programaticamente (jsPDF puro) — KPIs, insights, ações em 1 página         |
-| **Snapshot do Dashboard**   | PNG     | `html2canvas` captura a tela em alta resolução                             |
-| **Snapshot do Dashboard**   | PDF A4  | Mesma captura, embutida em PDF paisagem                                    |
-| **Copiar imagem**           | Clipboard | Copia o PNG para a área de transferência (cola direto no Teams/email)    |
-| **Excel completo**          | XLSX    | 4 abas — Resumo, Por Técnico, Por Status, Insights & Ações                 |
+| Saída                     | Formato     | Como é gerada                                                                             |
+| ------------------------- | ----------- | ----------------------------------------------------------------------------------------- |
+| **Resumo Executivo**      | PDF A4      | Gerado programaticamente (jsPDF puro) com layout de relatório executivo Minerva           |
+| **Dashboard como PDF**    | PDF A4      | Captura visual com **paginação automática** — preserva legibilidade em múltiplas páginas  |
+| **Dashboard como PNG**    | PNG (3x DPI) | Captura em alta resolução com fundo sólido                                                |
+| **Copiar imagem**         | Clipboard   | Copia o PNG para a área de transferência (cola direto no Teams/e-mail)                    |
+| **Excel completo**        | XLSX        | 4 abas — Resumo, Por Técnico, Por Status, Insights & Ações                                |
+
+### Resumo Executivo (PDF) — anatomia
+
+Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva, sem screenshot — tudo desenhado dos dados.
+
+**Página 1 — Visão geral**
+
+- **Header**: ribbon Minerva red 3 mm + bloco navy de 31 mm com:
+  - Eyebrow `MINERVA FOODS · DOCUMENTO INTERNO`
+  - Título "Resumo Executivo" 22 pt
+  - Subtítulo do grupo
+  - Bloco direito com `PERÍODO` e `GERADO EM`
+- **Hero**: bloco navy escuro com:
+  - Total de chamados em 34 pt
+  - Delta `▲ X% vs período anterior`
+  - 3 pílulas (em aberto · finalizados · parados) com dots coloridos
+- **6 KPIs** (3×2) com:
+  - Borda lateral colorida
+  - Title small caps
+  - Valor 20 pt
+  - Subtítulo
+  - **Badge de delta** no canto superior direito (`▲`/`▼` + %), com cor invertida quando subir é ruim (parados, em aberto)
+- **Distribuição por Status**: barras horizontais coloridas com `count · %`
+- **Top 5 Técnicos**: barras horizontais com paleta variada
+
+**Página 2 — Análise**
+
+- Header navy simplificado
+- `LEITURA RÁPIDA`: insights em cards tonais (verde/âmbar/vermelho/cinza)
+- `PRÓXIMAS AÇÕES`: cards com painel lateral colorido `ALTA`/`MÉDIA`/`BAIXA`, contagem em destaque, título e descrição
+
+**Footer (todas as páginas)**
+
+- Linha divisora + `Central de Monitoramento RPA · Minerva Foods` + `Página X / Y`
+
+### Snapshot do Dashboard
+
+- **PDF**: paginação automática em A4 retrato (em vez de comprimir tudo numa página) — cada página com header navy/vermelho e footer com paginação
+- **PNG**: scale 3× e fundo sólido `#0F172A`
+- **Copiar imagem**: idem PNG, mas direto na área de transferência
 
 ### Excel — abas geradas
 
@@ -616,10 +658,10 @@ No Chrome/Edge aparece o ícone "Instalar" na barra de endereço. Instalado, abr
 ## Solução de Problemas
 
 <details>
-<summary><b>O painel mostra 2.001 chamados em vez dos ~756 do RPA</b></summary>
+<summary><b>O painel mostra exatamente 2001 chamados (ou um número próximo desse teto)</b></summary>
 <br/>
 
-O filtro de fila não está casando — o GLPI está devolvendo o universo até bater o teto do `range`.
+O filtro de fila não está casando — o GLPI está devolvendo o universo até bater o teto do `range` (`0-2000`).
 
 **Diagnóstico**: abra o DevTools → Console e procure por:
 

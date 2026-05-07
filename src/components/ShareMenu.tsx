@@ -8,7 +8,12 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Camera, Copy, FileDown, FileText, Loader2, Share2 } from 'lucide-react';
-import { ActionItem, Insight, TicketMetrics } from '../services/analytics';
+import {
+  ActionItem,
+  Insight,
+  MetricsDelta,
+  TicketMetrics,
+} from '../services/analytics';
 import { pushToast } from '../hooks/useToasts';
 
 type Action = 'pdf-summary' | 'png' | 'pdf-snapshot' | 'copy';
@@ -21,6 +26,12 @@ interface ShareMenuProps {
   actionItems: ActionItem[];
   periodLabel: string;
   groupName?: string;
+  /** Comparativo com período anterior — para o PDF executivo mostrar deltas. */
+  delta?: MetricsDelta;
+  /** Distribuição por status para o mini-chart no PDF executivo. */
+  statusBreakdown?: Array<{ status: string; count: number }>;
+  /** Top técnicos para o ranking no PDF executivo. */
+  technicianBreakdown?: Array<{ technician: string; count: number }>;
 }
 
 export function ShareMenu({
@@ -30,6 +41,9 @@ export function ShareMenu({
   actionItems,
   periodLabel,
   groupName,
+  delta,
+  statusBreakdown,
+  technicianBreakdown,
 }: ShareMenuProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<Action | null>(null);
@@ -83,6 +97,9 @@ export function ShareMenu({
           actionItems,
           periodLabel,
           groupName,
+          delta,
+          statusBreakdown,
+          technicianBreakdown,
         });
       },
       'Resumo executivo gerado'

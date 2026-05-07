@@ -294,6 +294,9 @@ export default function Dashboard() {
             actionItems={actionItems}
             periodLabel={periodLabel}
             groupName={config.groups.find(g => g.id === groupId)?.name}
+            delta={delta}
+            statusBreakdown={statusData}
+            technicianBreakdown={technicianData}
           />
         }
       />
