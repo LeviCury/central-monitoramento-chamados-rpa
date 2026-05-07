@@ -13,6 +13,58 @@ import { glpiTicketTaskListSchema } from './schemas';
 
 const ticketTaskCache = new Map<string, TicketTaskEntry[]>();
 
+// ---------- diagnostico temporario ----------
+// Imprime no console a estrutura das primeiras N tasks e o motivo
+// de cada uma ter sido aceita ou rejeitada. Sem isso, "0h" fica
+// sendo um buraco preto: nao da pra saber se e dado ausente,
+// categoria errada ou colaborador fora da whitelist.
+const TASK_DIAG_MAX = 8;
+let taskDiagSamples = 0;
+const taskDiagStats = {
+  totalTasksSeen: 0,
+  rejectedNoActionTime: 0,
+  rejectedNoCollaborator: 0,
+  acceptedPlanned: 0,
+  acceptedRealized: 0,
+  acceptedLegacy: 0,
+  uniqueCategoryIds: new Set<number>(),
+  uniqueUserIds: new Set<string>(),
+};
+function logTaskDiagSample(
+  ticketId: string,
+  rawTask: Record<string, unknown>,
+  outcome: string,
+  resolvedKind?: string,
+  resolvedCollaborator?: string | null
+) {
+  if (taskDiagSamples >= TASK_DIAG_MAX) return;
+  taskDiagSamples += 1;
+  console.log(
+    `[GLPI][diag] ticket=${ticketId} actiontime=${rawTask.actiontime} ` +
+      `taskcategories_id=${rawTask.taskcategories_id} ` +
+      `users_id=${rawTask.users_id ?? rawTask.users_id_tech ?? '-'} ` +
+      `outcome=${outcome}` +
+      (resolvedKind ? ` kind=${resolvedKind}` : '') +
+      (resolvedCollaborator ? ` collaborator=${resolvedCollaborator}` : ''),
+    rawTask
+  );
+}
+function flushTaskDiagStats() {
+  if (taskDiagStats.totalTasksSeen === 0) return;
+  console.log('[GLPI][diag] resumo de apontamentos:', {
+    ...taskDiagStats,
+    uniqueCategoryIds: Array.from(taskDiagStats.uniqueCategoryIds).sort(
+      (a, b) => a - b
+    ),
+    uniqueUserIds: Array.from(taskDiagStats.uniqueUserIds).slice(0, 30),
+    configuracaoAtual: {
+      plannedTaskCategoryId: config.glpi.plannedTaskCategoryId,
+      realizedTaskCategoryId: config.glpi.realizedTaskCategoryId,
+      colaboradoresPermitidos: config.collaborators.map(c => c.canonical),
+    },
+  });
+}
+
 function toNumber(value: unknown): number | null {
   if (typeof value === 'number') return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -73,24 +125,46 @@ export async function fetchTicketTaskEntries(
     const entries: TicketTaskEntry[] = [];
 
     for (const rawTask of parsed.data as Record<string, unknown>[]) {
+      taskDiagStats.totalTasksSeen += 1;
+      const rawCatId = toNumber(rawTask.taskcategories_id);
+      if (rawCatId !== null) taskDiagStats.uniqueCategoryIds.add(rawCatId);
+      const rawUserId = String(
+        rawTask.users_id ?? rawTask.users_id_tech ?? rawTask.users_id_editor ?? ''
+      );
+      if (rawUserId) taskDiagStats.uniqueUserIds.add(rawUserId);
+
       const actionTime = toNumber(rawTask.actiontime);
-      if (!actionTime || actionTime <= 0) continue;
+      if (!actionTime || actionTime <= 0) {
+        taskDiagStats.rejectedNoActionTime += 1;
+        logTaskDiagSample(ticketId, rawTask, 'rejected:no_actiontime');
+        continue;
+      }
 
       const collaborator = await resolveTaskCollaborator(rawTask);
-      if (!collaborator) continue;
+      if (!collaborator) {
+        taskDiagStats.rejectedNoCollaborator += 1;
+        logTaskDiagSample(ticketId, rawTask, 'rejected:collaborator_not_in_whitelist');
+        continue;
+      }
 
-      const categoryId = toNumber(rawTask.taskcategories_id);
+      const categoryId = rawCatId;
       const taskId = rawTask.id ?? rawTask['2'] ?? `${ticketId}-${entries.length + 1}`;
       const taskDate = rawTask.date ?? rawTask.date_creation ?? rawTask.date_mod ?? null;
       const content = rawTask.content ?? rawTask.name ?? '';
       const hours = Math.round((actionTime / 3600) * 10) / 10;
+      const kind = getTaskKind(categoryId);
+      if (kind === 'planned') taskDiagStats.acceptedPlanned += 1;
+      else if (kind === 'realized') taskDiagStats.acceptedRealized += 1;
+      else taskDiagStats.acceptedLegacy += 1;
+
+      logTaskDiagSample(ticketId, rawTask, 'accepted', kind, collaborator);
 
       entries.push({
         id: String(taskId),
         ticket_id: ticketId,
         collaborator,
         category_id: categoryId,
-        kind: getTaskKind(categoryId),
+        kind,
         hours,
         content: String(content).replace(/<[^>]+>/g, '').trim(),
         date: taskDate ? String(taskDate) : null,
@@ -135,6 +209,7 @@ export async function fetchMultipleTicketTaskEntries(
 
   const totalElapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
   console.log(`[GLPI] Apontamentos: ${total}/${total} concluido em ${totalElapsed}s`);
+  flushTaskDiagStats();
   return ticketTaskCache;
 }
 
