@@ -86,7 +86,13 @@ export const config = {
   ),
   ui: {
     autoRefreshMinutes: 20,
-    maxTicketsForHours: 200,
+    /**
+     * Acima deste limite, o painel pula a busca de apontamentos (TicketTask)
+     * para nao bloquear o navegador. Cada ticket faz 1 request ao GLPI.
+     * Com batch=12 paralelo, 1500 tickets levam ~25s na primeira carga
+     * e depois ficam em cache TanStack Query por 5min.
+     */
+    maxTicketsForHours: 1500,
     presentationCarouselMs: 12_000,
     staleThresholdDays: parseStaleDays(env.VITE_STALE_DAYS as string | undefined),
   },

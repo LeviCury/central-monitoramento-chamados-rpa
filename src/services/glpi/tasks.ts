@@ -112,16 +112,29 @@ export async function fetchMultipleTicketTaskEntries(
   const idsToFetch = ticketIds.filter(id => !ticketTaskCache.has(id));
   if (idsToFetch.length === 0) return ticketTaskCache;
 
-  console.log(`[GLPI] Buscando apontamentos de ${idsToFetch.length} tickets...`);
+  const total = idsToFetch.length;
+  const startedAt = performance.now();
+  console.log(`[GLPI] Buscando apontamentos de ${total} tickets em paralelo (batch=12)...`);
 
-  const batchSize = 5;
+  // 12 em paralelo sem delay artificial: balanço entre velocidade e
+  // não saturar o GLPI. ~25s para 1500 tickets em rede normal.
+  const batchSize = 12;
+  let processed = 0;
+  let nextLogAt = 100;
+
   for (let i = 0; i < idsToFetch.length; i += batchSize) {
     const batch = idsToFetch.slice(i, i + batchSize);
     await Promise.allSettled(batch.map(id => fetchTicketTaskEntries(id)));
-    if (i + batchSize < idsToFetch.length) {
-      await new Promise(resolve => setTimeout(resolve, 200));
+    processed += batch.length;
+    if (processed >= nextLogAt) {
+      const elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
+      console.log(`[GLPI] Apontamentos: ${processed}/${total} (${elapsed}s)`);
+      nextLogAt += 200;
     }
   }
+
+  const totalElapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
+  console.log(`[GLPI] Apontamentos: ${total}/${total} concluido em ${totalElapsed}s`);
   return ticketTaskCache;
 }
 

@@ -70,8 +70,18 @@ export default function Dashboard() {
   const [previousMetrics, setPreviousMetrics] = useState<TicketMetrics | null>(null);
   const captureRef = useRef<HTMLElement | null>(null);
 
-  const { tickets: rawTickets, isLoading, isFetching, isLoadingHours, isError, error, lastUpdate, refetch } =
-    useGLPITickets({ filters, groupId });
+  const {
+    tickets: rawTickets,
+    isLoading,
+    isFetching,
+    isLoadingHours,
+    hoursSkipped,
+    hoursMaxLimit,
+    isError,
+    error,
+    lastUpdate,
+    refetch,
+  } = useGLPITickets({ filters, groupId });
 
   const timeAgo = useTimeAgo(lastUpdate);
   const hasDateFilter = Boolean(filters.dateRange.start && filters.dateRange.end);
@@ -253,7 +263,16 @@ export default function Dashboard() {
     {
       id: 'kpis',
       label: 'KPIs',
-      content: <KPIGrid metrics={metrics} delta={delta} loadingHours={isLoadingHours} large />,
+      content: (
+        <KPIGrid
+          metrics={metrics}
+          delta={delta}
+          loadingHours={isLoadingHours}
+          hoursSkipped={hoursSkipped}
+          hoursMaxLimit={hoursMaxLimit}
+          large
+        />
+      ),
     },
     {
       id: 'timeline',
@@ -383,6 +402,8 @@ export default function Dashboard() {
                 metrics={metrics}
                 delta={delta}
                 loadingHours={isLoadingHours}
+                hoursSkipped={hoursSkipped}
+                hoursMaxLimit={hoursMaxLimit}
                 large={presentationMode}
               />
             </div>

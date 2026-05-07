@@ -15,6 +15,13 @@ interface KPIGridProps {
   metrics: TicketMetrics;
   delta: MetricsDelta;
   loadingHours: boolean;
+  /**
+   * True quando o numero de tickets do recorte ultrapassou o limite
+   * `maxTicketsForHours` e por isso os apontamentos nao foram buscados.
+   * Cards de horas mostram aviso em vez de "0h" enganoso.
+   */
+  hoursSkipped?: boolean;
+  hoursMaxLimit?: number;
   large?: boolean;
 }
 
@@ -168,7 +175,14 @@ function MixSubtitle({ incident, request, unknown, dominant }: MixSubtitleProps)
   );
 }
 
-export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGridProps) {
+export function KPIGrid({
+  metrics,
+  delta,
+  loadingHours,
+  hoursSkipped = false,
+  hoursMaxLimit,
+  large = false,
+}: KPIGridProps) {
   const balanceIsLoss = metrics.hoursBalanceType === 'loss';
   const balanceIsNeutral = metrics.hoursBalanceType === 'neutral';
   const balanceTitle = balanceIsNeutral
@@ -260,11 +274,19 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
         />
         <KPICard
           title="Média de Horas"
-          value={loadingHours ? '...' : formatHoursMinutes(metrics.avgWorkHours)}
+          value={
+            hoursSkipped
+              ? '—'
+              : loadingHours
+                ? '...'
+                : formatHoursMinutes(metrics.avgWorkHours)
+          }
           subtitle={
-            loadingHours
-              ? 'Calculando...'
-              : `${formatHoursMinutes(metrics.totalRealizedHours)} realizadas no total`
+            hoursSkipped
+              ? `Recorte com mais de ${hoursMaxLimit ?? '?'} chamados — reduza o período para carregar horas`
+              : loadingHours
+                ? 'Calculando...'
+                : `${formatHoursMinutes(metrics.totalRealizedHours)} realizadas no total`
           }
           icon={<Clock className={iconClass} aria-hidden />}
           color="violet"
@@ -273,15 +295,35 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
           loading={loadingHours}
         />
         <KPICard
-          title={balanceTitle}
-          value={loadingHours ? '...' : formatHoursMinutes(Math.abs(metrics.hoursBalance))}
-          subtitle={loadingHours ? 'Calculando...' : balanceSubtitle}
+          title={hoursSkipped ? 'Saldo de Horas' : balanceTitle}
+          value={
+            hoursSkipped
+              ? '—'
+              : loadingHours
+                ? '...'
+                : formatHoursMinutes(Math.abs(metrics.hoursBalance))
+          }
+          subtitle={
+            hoursSkipped
+              ? `Apontamentos não buscados (${hoursMaxLimit ?? '?'} chamados é o teto)`
+              : loadingHours
+                ? 'Calculando...'
+                : balanceSubtitle
+          }
           icon={
             balanceIsLoss
               ? <TrendingDown className={iconClass} aria-hidden />
               : <TrendingUp className={iconClass} aria-hidden />
           }
-          color={balanceIsLoss ? 'red' : balanceIsNeutral ? 'navy' : 'green'}
+          color={
+            hoursSkipped
+              ? 'navy'
+              : balanceIsLoss
+                ? 'red'
+                : balanceIsNeutral
+                  ? 'navy'
+                  : 'green'
+          }
           delay={4}
           large={large}
           loading={loadingHours}

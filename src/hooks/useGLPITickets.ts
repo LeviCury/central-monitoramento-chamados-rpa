@@ -52,10 +52,20 @@ export function useGLPITickets({ filters, groupId }: UseGLPITicketsOptions) {
   const tickets = useMemo(() => ticketsQuery.data ?? [], [ticketsQuery.data]);
   const ticketIdsKey = useMemo(() => tickets.map(t => t.id).join(','), [tickets]);
 
+  const hoursSkipped =
+    tickets.length > config.ui.maxTicketsForHours;
+
   const hoursQuery = useQuery({
     queryKey: [HOURS_KEY, ticketIdsKey],
     queryFn: async () => {
-      if (tickets.length === 0 || tickets.length > config.ui.maxTicketsForHours) {
+      if (tickets.length === 0 || hoursSkipped) {
+        if (hoursSkipped) {
+          console.warn(
+            `[GLPI] ${tickets.length} tickets no recorte > limite de ${config.ui.maxTicketsForHours}. ` +
+              'Apontamentos NAO foram buscados (cards de horas ficam vazios). ' +
+              'Reduza o periodo do filtro ou aumente config.ui.maxTicketsForHours.'
+          );
+        }
         return tickets;
       }
       const updated = await fetchWorkHoursForTickets([...tickets]);
@@ -80,6 +90,10 @@ export function useGLPITickets({ filters, groupId }: UseGLPITicketsOptions) {
     isLoading: ticketsQuery.isLoading,
     isFetching: ticketsQuery.isFetching,
     isLoadingHours: hoursQuery.isFetching && tickets.length > 0,
+    /** True quando o recorte e maior que `maxTicketsForHours` e por isso
+     *  os apontamentos nao foram buscados (cards de horas ficam zerados). */
+    hoursSkipped,
+    hoursMaxLimit: config.ui.maxTicketsForHours,
     isError: ticketsQuery.isError,
     error: ticketsQuery.error,
     lastUpdate: ticketsQuery.dataUpdatedAt
