@@ -10,6 +10,7 @@ import {
   fetchTicketsFromGLPI,
   fetchMultipleTicketTaskEntries,
 } from './glpi';
+import { formatHoursMinutes } from '../utils/timeFormat';
 
 // ======================================================
 // Fetching
@@ -731,9 +732,10 @@ export const generateInsights = (
   if (delta.previous && delta.deltas.total !== null) {
     const d = delta.deltas.total;
     const baseLow = delta.previous.total < 5;
+    const direction = d > 0 ? 'subiu' : d < 0 ? 'caiu' : 'estável em';
     const text = baseLow
-      ? `Volume de ${metrics.total} chamados (variação ${formatPercent(d)} vs período anterior — base muito baixa, leitura instável).`
-      : `Volume ${d > 0 ? 'subiu' : d < 0 ? 'caiu' : 'estável'} ${formatPercent(d)} vs período anterior (${delta.previous.total} → ${metrics.total}).`;
+      ? `Volume de chamados: ${metrics.total} no período atual (variação ${formatPercent(d)} vs período anterior — base muito baixa, leitura instável).`
+      : `Volume de chamados ${direction} ${formatPercent(d)} vs período anterior — passamos de ${delta.previous.total} para ${metrics.total} chamados no recorte.`;
     out.push({
       id: 'volume',
       tone: d > 20 ? 'warn' : d < -20 ? 'good' : 'neutral',
@@ -749,44 +751,47 @@ export const generateInsights = (
       id: 'closure',
       tone,
       emoji: tone === 'good' ? '✅' : tone === 'warn' ? '⚠️' : '•',
-      text: `Taxa de resolução em ${metrics.closureRate}% (${metrics.finalized} de ${metrics.total} finalizados).`,
+      text: `Taxa de resolução em ${metrics.closureRate}% — ${metrics.finalized} dos ${metrics.total} chamados foram finalizados (fechados ou solucionados) no período.`,
     });
   }
 
   if (metrics.staleCount > 0) {
+    const plural = metrics.staleCount === 1 ? '' : 's';
     out.push({
       id: 'stale',
       tone: 'bad',
       emoji: '⏰',
-      text: `${metrics.staleCount} chamado${metrics.staleCount === 1 ? '' : 's'} parado${metrics.staleCount === 1 ? '' : 's'} há mais de ${metrics.staleThresholdDays}d (média ${metrics.avgDaysOpen.toFixed(1)}d em aberto).`,
+      text: `${metrics.staleCount} chamado${plural} aberto${plural} há mais de ${metrics.staleThresholdDays} dias (limite definido para o time). Média atual de ${metrics.avgDaysOpen.toFixed(1)} dias em aberto — vale revisar prioridade ou fechamento.`,
     });
   } else if (metrics.open > 0) {
     out.push({
       id: 'stale',
       tone: 'good',
       emoji: '✅',
-      text: `Nenhum chamado parado acima do limite de ${metrics.staleThresholdDays}d.`,
+      text: `Nenhum chamado aberto acima do limite de ${metrics.staleThresholdDays} dias — backlog saudável.`,
     });
   }
 
   if (metrics.hoursBalanceType !== 'neutral' && metrics.totalRealizedHours > 0) {
     const isLoss = metrics.hoursBalanceType === 'loss';
+    const balance = formatHoursMinutes(Math.abs(metrics.hoursBalance));
     out.push({
       id: 'hours',
       tone: isLoss ? 'warn' : 'good',
       emoji: isLoss ? '⏱' : '🎯',
       text: isLoss
-        ? `Horas realizadas excedem o planejado em ${Math.abs(metrics.hoursBalance).toFixed(1)}h.`
-        : `Ganho de ${metrics.hoursBalance.toFixed(1)}h vs planejado (eficiência acima do estimado).`,
+        ? `Horas realizadas excedem o planejado em ${balance} — chamados estão consumindo mais esforço do que o estimado; vale revisar planejamento.`
+        : `Ganho de ${balance} vs planejado — o time entregou em menos tempo do que havia estimado, indicando boa estimativa ou produtividade acima do plano.`,
     });
   }
 
   if (metrics.pendingHoursNotes > 0) {
+    const plural = metrics.pendingHoursNotes === 1 ? '' : 's';
     out.push({
       id: 'hours-notes',
       tone: 'warn',
       emoji: '📝',
-      text: `${metrics.pendingHoursNotes} chamado${metrics.pendingHoursNotes === 1 ? '' : 's'} sem apontamento completo de horas.`,
+      text: `${metrics.pendingHoursNotes} chamado${plural} sem apontamento completo de horas (planejado e/ou realizado em branco) — ficam fora dos cálculos de eficiência até serem preenchidos.`,
     });
   }
 

@@ -236,6 +236,31 @@ function setDraw(pdf: jsPDF, c: RGB) {
   pdf.setDrawColor(c[0], c[1], c[2]);
 }
 
+/**
+ * Substitui glifos que a Helvetica embutida no jsPDF nao tem por
+ * equivalentes ASCII. Acentos Latin-1 (a-z + cedilha + til/agudo/circunflexo)
+ * sao suportados pela Helvetica padrao — ficam preservados.
+ *
+ * Os emojis de status (✅ ⚠️ ⏰ ⏱ 🎯 📝 etc.) sao removidos porque
+ * apareciam como retangulos vazios. As setas Unicode (→ ↑ ↓ ▲ ▼) sao
+ * trocadas por equivalentes textuais.
+ */
+function sanitizeForPdf(text: string): string {
+  return text
+    .replace(/→/g, '->')
+    .replace(/←/g, '<-')
+    .replace(/↑/g, '(subiu)')
+    .replace(/↓/g, '(caiu)')
+    .replace(/▲/g, '+')
+    .replace(/▼/g, '-')
+    // Remove emojis (BMP + plano astral)
+    .replace(/[\u{1F300}-\u{1FAFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/\uFE0F/g, '') // variation selector que costuma vir junto de ⚠️
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 const TONE_COLOR: Record<Insight['tone'], RGB> = {
   good: BRAND.green,
   warn: BRAND.amber,
@@ -384,8 +409,12 @@ interface KpiCard {
   value: string;
   /** Subtítulo de 1 linha (modo simples). Ignorado se `subtitleLines` for fornecido. */
   subtitle?: string;
-  /** Subtítulo multilinha didático. Cada item é uma linha (até 3-4). */
-  subtitleLines?: Array<{ value: string; label: string; hint?: string }>;
+  /**
+   * Subtítulo multilinha didático. Cada item é uma linha (até 4).
+   * `alert: true` destaca a linha como aviso (cor avermelhada + dot)
+   * — uso típico: chamados parados há mais de N dias.
+   */
+  subtitleLines?: Array<{ value: string; label: string; hint?: string; alert?: boolean }>;
   /** Mini-pílulas Inc/Req embutidas no rodapé do card. */
   typeBreakdown?: TypeBreakdown;
   color: RGB;
@@ -419,7 +448,7 @@ function drawTypePillsInline(
 ): void {
   const items: Array<{ label: string; color: RGB }> = [
     { label: `Incidente ${bd.incident}`, color: BRAND.red },
-    { label: `Requisicao ${bd.request}`, color: BRAND.blue },
+    { label: `Requisição ${bd.request}`, color: BRAND.blue },
   ];
   if (bd.unknown > 0) items.push({ label: `Sem tipo ${bd.unknown}`, color: BRAND.slate });
 
@@ -484,24 +513,32 @@ function drawKpiCard(
   if (c.subtitleLines && c.subtitleLines.length > 0) {
     cursorY += 2;
     for (const line of c.subtitleLines) {
+      const lineLeft = line.alert ? innerLeft + 3 : innerLeft;
+
+      // Dot vermelho discreto à esquerda quando é uma linha de alerta
+      if (line.alert) {
+        setFill(pdf, BRAND.red);
+        pdf.circle(innerLeft + 0.8, cursorY - 1.4, 0.9, 'F');
+      }
+
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8.5);
-      setColor(pdf, BRAND.navy);
+      setColor(pdf, line.alert ? BRAND.red : BRAND.navy);
       const valueText = String(line.value);
-      pdf.text(valueText, innerLeft, cursorY);
+      pdf.text(valueText, lineLeft, cursorY);
       const valueW = pdf.getTextWidth(valueText);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(7.5);
-      setColor(pdf, BRAND.text);
-      pdf.text(' ' + line.label, innerLeft + valueW, cursorY);
+      setColor(pdf, line.alert ? BRAND.red : BRAND.text);
+      pdf.text(' ' + line.label, lineLeft + valueW, cursorY);
 
       if (line.hint) {
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(6.5);
-        setColor(pdf, BRAND.muted);
-        const hintLines = pdf.splitTextToSize(line.hint, innerWidth);
-        pdf.text(hintLines[0], innerLeft, cursorY + 3.2);
+        setColor(pdf, line.alert ? BRAND.redDark : BRAND.muted);
+        const hintLines = pdf.splitTextToSize(line.hint, innerWidth - (line.alert ? 3 : 0));
+        pdf.text(hintLines[0], lineLeft, cursorY + 3.2);
         cursorY += 7.5;
       } else {
         cursorY += 4.8;
@@ -548,7 +585,7 @@ function drawKpiCard(
     pdf.setFont('helvetica', 'italic');
     pdf.setFontSize(6.4);
     pdf.text(
-      'compara com periodo anterior de mesma duracao',
+      'comparado com o período anterior de mesma duração',
       innerLeft,
       cursorY + 2
     );
@@ -598,11 +635,6 @@ function drawHeroBlock(
   const pills = [
     { label: 'em aberto', value: metrics.open.toLocaleString('pt-BR'), color: BRAND.amber },
     { label: 'finalizados', value: metrics.finalized.toLocaleString('pt-BR'), color: BRAND.green },
-    {
-      label: 'parados',
-      value: metrics.staleCount.toLocaleString('pt-BR'),
-      color: metrics.staleCount > 0 ? BRAND.red : BRAND.green,
-    },
   ];
   let pillX = blockX + blockW - 6;
   for (let i = pills.length - 1; i >= 0; i--) {
@@ -679,7 +711,7 @@ function drawDidacticLegend(pdf: jsPDF, y: number): number {
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
   pdf.text(
-    'Cada variacao compara o periodo atual com o periodo anterior de mesma duracao.',
+    'Cada variação compara o período atual com o período anterior de mesma duração.',
     x + 4,
     y + 8
   );
@@ -696,7 +728,7 @@ function drawDidacticLegend(pdf: jsPDF, y: number): number {
   setColor(pdf, BRAND.text);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7);
-  pdf.text('subiu (verde = direcao desejada)', x + 11, legY);
+  pdf.text('subiu (verde = direção desejada)', x + 11, legY);
 
   setFill(pdf, BRAND.red);
   pdf.roundedRect(x + 73, legY - 2, 6.2, 3, 1, 1, 'F');
@@ -707,7 +739,7 @@ function drawDidacticLegend(pdf: jsPDF, y: number): number {
   setColor(pdf, BRAND.text);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(7);
-  pdf.text('caiu (vermelho = direcao indesejada)', x + 81, legY);
+  pdf.text('caiu (vermelho = direção indesejada)', x + 81, legY);
 
   return y + h + 5;
 }
@@ -867,7 +899,7 @@ function drawTypeBreakdownSection(
     const stats = [
       { label: 'em aberto', value: String(b.open), color: BRAND.amber },
       { label: 'parados', value: String(b.stale), color: b.stale > 0 ? BRAND.red : BRAND.green },
-      { label: 'resolucao', value: `${closure}%`, color: BRAND.green },
+      { label: 'resolução', value: `${closure}%`, color: BRAND.green },
     ];
 
     const statW = (colW - 12) / stats.length;
@@ -938,36 +970,40 @@ function drawInsightCard(pdf: jsPDF, y: number, ins: Insight): number {
   const w = PAGE.w - PAGE.margin * 2;
   const innerPad = 4;
   const accentW = 2.5;
+  const lineH = 3.8;
 
-  // Calcula altura baseada em texto
+  // Calcula altura baseada em texto sanitizado
   pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(9.5);
-  const textLines = pdf.splitTextToSize(ins.text, w - innerPad * 2 - accentW - 2);
-  const h = Math.max(11, 4 + textLines.length * 4.2 + 3);
+  pdf.setFontSize(9);
+  const safeText = sanitizeForPdf(ins.text);
+  const textLines = pdf.splitTextToSize(safeText, w - innerPad * 2 - accentW - 2);
+  const h = Math.max(9, 3.5 + textLines.length * lineH + 2);
 
   // Fundo
   setFill(pdf, TONE_BG[ins.tone]);
-  pdf.roundedRect(x, y, w, h, 2, 2, 'F');
+  pdf.roundedRect(x, y, w, h, 1.8, 1.8, 'F');
 
-  // Acento
+  // Acento lateral
   setFill(pdf, TONE_COLOR[ins.tone]);
-  pdf.roundedRect(x, y, accentW, h, 1.2, 1.2, 'F');
+  pdf.roundedRect(x, y, accentW, h, 1, 1, 'F');
 
   // Texto
   setColor(pdf, BRAND.text);
-  pdf.text(textLines, x + accentW + innerPad, y + 5.5);
+  pdf.text(textLines, x + accentW + innerPad, y + 5);
 
-  return y + h + 2.5;
+  return y + h + 1.5;
 }
 
 function drawActionCard(pdf: jsPDF, y: number, a: ActionItem): number {
   const x = PAGE.margin;
   const w = PAGE.w - PAGE.margin * 2;
   const sevColor = SEVERITY_COLOR[a.severity];
+  const safeTitle = sanitizeForPdf(a.title);
+  const safeDesc = sanitizeForPdf(a.description);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  const descLines = pdf.splitTextToSize(a.description, w - 30);
+  const descLines = pdf.splitTextToSize(safeDesc, w - 30);
   const h = Math.max(15, 6 + 5 + descLines.length * 4 + 2);
 
   // Fundo branco com borda
@@ -995,7 +1031,7 @@ function drawActionCard(pdf: jsPDF, y: number, a: ActionItem): number {
   setColor(pdf, BRAND.text);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10.5);
-  pdf.text(a.title, x + 26, y + 7);
+  pdf.text(safeTitle, x + 26, y + 7);
 
   // Description
   setColor(pdf, BRAND.muted);
@@ -1023,31 +1059,41 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   // Legenda didática explicando as %
   y = drawDidacticLegend(pdf, y);
 
-  // KPIs grid (3 colunas × 2 linhas) — altura maior pra acomodar
-  // 3 linhas de subtítulo + delta + pílulas Inc/Req com texto completo
-  const kpiW = (PAGE.w - PAGE.margin * 2 - 5 * 2) / 3;
+  // KPIs: 5 cards no total. Linha 1 com 3 cards (Total, Taxa, Em Aberto)
+  // ocupando a largura toda; linha 2 com 2 cards (Média / Saldo) também
+  // preenchendo a largura toda — sem buracos visuais.
+  const gap = 5;
   const kpiH = 48;
+  const totalW = PAGE.w - PAGE.margin * 2;
+  const kpiW3 = (totalW - gap * 2) / 3;
+  const kpiW2 = (totalW - gap) / 2;
   const cards = buildKpiCards(input);
 
-  for (let i = 0; i < cards.length; i++) {
-    const col = i % 3;
-    const row = Math.floor(i / 3);
-    const cx = PAGE.margin + col * (kpiW + 5);
-    const cy = y + row * (kpiH + 5);
-    drawKpiCard(pdf, cx, cy, kpiW, kpiH, cards[i]);
+  // Linha 1 (3 cards)
+  for (let i = 0; i < 3 && i < cards.length; i++) {
+    const cx = PAGE.margin + i * (kpiW3 + gap);
+    const cy = y;
+    drawKpiCard(pdf, cx, cy, kpiW3, kpiH, cards[i]);
   }
-  y += kpiH * 2 + 5 + 8;
+  // Linha 2 (2 cards mais largos)
+  for (let i = 3; i < cards.length; i++) {
+    const idx = i - 3;
+    const cx = PAGE.margin + idx * (kpiW2 + gap);
+    const cy = y + kpiH + gap;
+    drawKpiCard(pdf, cx, cy, kpiW2, kpiH, cards[i]);
+  }
+  y += kpiH * 2 + gap + 8;
 
   // Quebra para a próxima página se vai ficar apertado
   if (y > PAGE.h - 75) {
     pdf.addPage();
-    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuições');
     y = 22;
   }
 
   // Distribuição por Status (se vier)
   if (input.statusBreakdown && input.statusBreakdown.length > 0) {
-    y = drawSectionTitle(pdf, y, 'Distribuicao por Status', BRAND.red);
+    y = drawSectionTitle(pdf, y, 'Distribuição por Status', BRAND.red);
     y = drawStatusBreakdown(pdf, y, input.statusBreakdown, input.metrics.total);
     y += 4;
   }
@@ -1055,7 +1101,7 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   // Por Tipo de Chamado
   if (y > PAGE.h - 60) {
     pdf.addPage();
-    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+    drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuições');
     y = 22;
   }
   y = drawSectionTitle(pdf, y, 'Por Tipo de Chamado', BRAND.red);
@@ -1065,10 +1111,10 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   if (input.technicianBreakdown && input.technicianBreakdown.length > 0) {
     if (y > PAGE.h - 65) {
       pdf.addPage();
-      drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuicoes');
+      drawSimplePageHeader(pdf, 'Resumo Executivo · Distribuições');
       y = 22;
     }
-    y = drawSectionTitle(pdf, y, 'Top 5 Tecnicos', BRAND.red);
+    y = drawSectionTitle(pdf, y, 'Top 5 Técnicos', BRAND.red);
     y = drawTechnicianBreakdown(pdf, y, input.technicianBreakdown);
   }
 
@@ -1139,9 +1185,9 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
 
   // IMPORTANTE: só passamos `delta` em KPIs onde comparar com o período
   // anterior é informativo (Total e Taxa de Resolução). Os demais KPIs
-  // são *snapshots* (em aberto, parados, média de horas, saldo) — comparar
-  // 7 chamados parados hoje com 1 chamado de uma semana atrás vira "+600%"
-  // e não ajuda a tomar decisão. Mantemos só o número.
+  // são *snapshots* (em aberto, médias, saldo) — comparar valores
+  // pontuais vira ruído sem informação real. Mantemos só o número.
+  // O alerta de chamados parados aparece como 4a linha do card "Em Aberto".
   return [
     {
       title: 'Total de Chamados',
@@ -1165,39 +1211,38 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
       subtitleLines: [
         {
           value: String(m.inProgress),
-          label: 'em atendimento',
-          hint: 'na nossa mao',
+          label: 'Em atendimento',
+          hint: 'na nossa mão',
         },
         {
           value: String(m.pending),
-          label: 'pendentes',
+          label: 'Pendentes',
           hint: 'aguardando externos (cliente / fornecedor)',
         },
         {
           value: String(m.newTickets),
-          label: 'novos',
-          hint: 'ainda nao atribuidos',
+          label: 'Novos',
+          hint: 'ainda não atribuídos',
         },
+        ...(m.staleCount > 0
+          ? [
+              {
+                value: String(m.staleCount),
+                label: 'Parados',
+                hint: `há mais de ${m.staleThresholdDays} dias — revisar`,
+                alert: true,
+              },
+            ]
+          : []),
       ],
       typeBreakdown: m.openByType,
       color: BRAND.amber,
       // sem delta — KPI snapshot
     },
     {
-      title: 'Chamados Parados',
-      value: m.staleCount.toLocaleString('pt-BR'),
-      subtitle:
-        m.staleCount === 0
-          ? `Nenhum acima de ${m.staleThresholdDays} dias`
-          : `Media ${m.avgDaysOpen.toFixed(1)}d em aberto (limite ${m.staleThresholdDays}d)`,
-      typeBreakdown: m.staleCount > 0 ? m.staleByType : undefined,
-      color: m.staleCount > 0 ? BRAND.red : BRAND.green,
-      // sem delta — KPI snapshot
-    },
-    {
-      title: 'Media de Horas',
+      title: 'Média de Horas',
       value: `${m.avgWorkHours.toFixed(1)}h`,
-      subtitle: `${m.totalRealizedHours.toFixed(1)}h realizadas no periodo`,
+      subtitle: `${m.totalRealizedHours.toFixed(1)}h realizadas no período`,
       color: BRAND.blue,
       // sem delta — média varia muito com sample pequeno
     },

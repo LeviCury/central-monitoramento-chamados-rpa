@@ -159,7 +159,7 @@ export function KPICard({
       )}
 
       {breakdown && (
-        <div className="mt-3 pt-3 border-t border-white/15 flex flex-wrap gap-1.5">
+        <div className="mt-auto pt-4 border-t border-white/15 flex flex-wrap gap-1.5">
           {breakdown}
         </div>
       )}

@@ -63,11 +63,20 @@ interface OpenSubtitleProps {
   inProgress: number;
   pending: number;
   newTickets: number;
+  staleCount: number;
+  staleThresholdDays: number;
 }
 
-function OpenSubtitle({ inProgress, pending, newTickets }: OpenSubtitleProps) {
+function OpenSubtitle({
+  inProgress,
+  pending,
+  newTickets,
+  staleCount,
+  staleThresholdDays,
+}: OpenSubtitleProps) {
+  const staleTooltip = `Em aberto há mais de ${staleThresholdDays} dias — vale revisar prioridade ou fechamento.`;
   return (
-    <ul className="space-y-1.5 text-white" aria-label="Quebra dos chamados em aberto">
+    <ul className="space-y-1 text-white" aria-label="Quebra dos chamados em aberto">
       <li className="flex items-baseline gap-2 leading-snug">
         <span className="font-semibold tabular-nums shrink-0">{inProgress}</span>
         <span className="text-sm shrink-0">em atendimento</span>
@@ -89,6 +98,21 @@ function OpenSubtitle({ inProgress, pending, newTickets }: OpenSubtitleProps) {
         <span className="text-sm shrink-0">novos</span>
         <span className="text-[11px] text-white/75">não atribuídos</span>
       </li>
+      {staleCount > 0 && (
+        <li
+          className="flex items-center gap-2 leading-snug pt-1.5 mt-1 border-t border-white/15"
+          title={staleTooltip}
+        >
+          <AlarmClock className="w-3.5 h-3.5 text-rose-100 shrink-0" aria-hidden />
+          <span className="font-semibold tabular-nums shrink-0 text-rose-50">{staleCount}</span>
+          <span className="text-sm shrink-0 text-rose-50">
+            parado{staleCount === 1 ? '' : 's'}
+          </span>
+          <span className="text-[11px] text-rose-100/90">
+            há mais de {staleThresholdDays}d
+          </span>
+        </li>
+      )}
     </ul>
   );
 }
@@ -107,11 +131,6 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
       ? 'Horas realizadas acima do planejado'
       : 'Horas economizadas vs planejado';
 
-  const staleSubtitle =
-    metrics.staleCount === 0
-      ? `Nenhum chamado parado há mais de ${metrics.staleThresholdDays} dias`
-      : `Média ${metrics.avgDaysOpen.toFixed(1)}d em aberto · limite ${metrics.staleThresholdDays}d`;
-
   const iconClass = large ? 'w-8 h-8' : 'w-6 h-6';
   const hasComparison = delta.previous !== null;
 
@@ -122,8 +141,8 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-hidden />
           <span>
             Variações em <strong>%</strong> aparecem apenas em KPIs onde a comparação faz sentido
-            (Total e Taxa de Resolução). KPIs de snapshot — em aberto, parados, médias — mostram
-            apenas o número atual.
+            (Total e Taxa de Resolução). KPIs de snapshot — em aberto, médias e saldo de horas —
+            mostram apenas o número atual.
           </span>
         </div>
       )}
@@ -159,22 +178,14 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
               inProgress={metrics.inProgress}
               pending={metrics.pending}
               newTickets={metrics.newTickets}
+              staleCount={metrics.staleCount}
+              staleThresholdDays={metrics.staleThresholdDays}
             />
           }
           breakdown={<TypePills breakdown={metrics.openByType} />}
           icon={<Users className={iconClass} aria-hidden />}
           color="amber"
           delay={2}
-          large={large}
-        />
-        <KPICard
-          title="Chamados Parados"
-          value={metrics.staleCount}
-          subtitle={staleSubtitle}
-          breakdown={metrics.staleCount > 0 ? <TypePills breakdown={metrics.staleByType} /> : undefined}
-          icon={<AlarmClock className={iconClass} aria-hidden />}
-          color={metrics.staleCount > 0 ? 'red' : 'green'}
-          delay={3}
           large={large}
         />
         <KPICard
@@ -187,7 +198,7 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
           }
           icon={<Clock className={iconClass} aria-hidden />}
           color="violet"
-          delay={4}
+          delay={3}
           large={large}
           loading={loadingHours}
         />
@@ -201,7 +212,7 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
               : <TrendingUp className={iconClass} aria-hidden />
           }
           color={balanceIsLoss ? 'red' : balanceIsNeutral ? 'navy' : 'green'}
-          delay={5}
+          delay={4}
           large={large}
           loading={loadingHours}
         />
