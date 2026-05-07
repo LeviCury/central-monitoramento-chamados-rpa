@@ -676,7 +676,11 @@ No Chrome/Edge aparece o ícone "Instalar" na barra de endereço. Instalado, abr
 4. *Deploy*
 
 > [!WARNING]
-> **CORS em produção**: a API GLPI precisa permitir requisições do domínio do deploy. Se isso não for possível, mantenha o painel atrás da rede interna ou implante um proxy backend.
+> **GLPI interno + Vercel = você precisa de CORS liberado no GLPI.** Como o servidor GLPI da Minerva só responde dentro da VPN, qualquer função serverless (Vercel/AWS) também não consegue alcançá-lo. O único caminho viável é: o navegador do usuário (já na VPN) chama o GLPI direto. Pra isso, o servidor que serve `apirest.php` precisa devolver headers `Access-Control-Allow-Origin` apontando pro seu domínio Vercel.
+>
+> Documento técnico pronto pra encaminhar ao TI: [`docs/INFRA-CORS.md`](docs/INFRA-CORS.md).
+>
+> Se o TI não puder liberar CORS, a alternativa é hospedar dentro da rede Minerva (1 VM ou container basta — o repositório já gera `dist/` estático que pode ser servido por qualquer Nginx/IIS atrás de um proxy reverso).
 
 ---
 
@@ -704,14 +708,22 @@ O filtro de fila não está casando — o GLPI está devolvendo o universo até 
 </details>
 
 <details>
-<summary><b>Erro de CORS em produção</b></summary>
+<summary><b>Em produção (Vercel) o painel mostra "0 chamados" ou erro "Failed to fetch"</b></summary>
 <br/>
 
-A API GLPI bloqueia requisições do domínio. Soluções:
+Cenário típico: GLPI da Minerva é **intranet** (só responde com VPN), então o navegador bloqueia a chamada por **CORS** ou simplesmente não consegue alcançar o host quando o usuário está fora da VPN.
 
-1. **Configurar CORS no GLPI** para aceitar o domínio do deploy
-2. **Implantar atrás de um proxy** (nginx, Cloudflare Worker) que adicione os headers
-3. **Manter na rede interna** com acesso direto à API
+**Diagnóstico em 30s:**
+
+1. Abra o DevTools no domínio do Vercel → **Console**: se aparecer `TypeError: Failed to fetch` ou `CORS policy: No 'Access-Control-Allow-Origin' header`, é isto.
+2. Confirme que o usuário está conectado à VPN/intranet Minerva. Sem VPN, nem com CORS perfeito o navegador alcança o GLPI.
+3. Teste no celular pelo 4G (sem VPN): se `https://central.minervafoods.com/apirest.php` não abre, o GLPI é interno mesmo.
+
+**Soluções (em ordem de esforço):**
+
+1. **Pedir CORS ao TI**: encaminhe [`docs/INFRA-CORS.md`](docs/INFRA-CORS.md) — tem o pedido técnico pronto, exemplos de configuração para Apache/Nginx/IIS e um `curl` de validação.
+2. **Hospedar dentro da rede Minerva**: 1 VM Linux/Windows com Node ≥ 18 (ou Docker) já basta. Recursos mínimos: 1 vCPU, 512 MB RAM. Nesse cenário, configure um proxy reverso `/api/glpi/*` → `https://central.minervafoods.com/apirest.php/*` e ajuste `src/config.ts` para apontar `baseUrl` para `/api/glpi` também em produção. Sem CORS, sem credenciais no bundle.
+3. **Túnel reverso aprovado** (Cloudflare Tunnel / Tailscale Funnel): publica o GLPI em endpoint controlado. Requer apreciação de segurança.
 
 </details>
 

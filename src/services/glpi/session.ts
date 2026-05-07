@@ -22,13 +22,29 @@ async function createSession(): Promise<string> {
 
   console.log('[GLPI] Criando nova sessão...');
 
-  const response = await fetch(`${config.glpi.baseUrl}/initSession/`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Basic ${config.glpi.authBasic}`,
-      'App-Token': config.glpi.appToken,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${config.glpi.baseUrl}/initSession/`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Basic ${config.glpi.authBasic}`,
+        'App-Token': config.glpi.appToken,
+      },
+    });
+  } catch (err) {
+    // Tipico TypeError: "Failed to fetch" — quase sempre uma destas tres causas
+    // em produçao (Vercel + GLPI interno):
+    //   1) Usuario fora da VPN/intranet → DNS/host inalcançavel
+    //   2) Servidor GLPI nao devolve headers CORS para o origin atual
+    //   3) Mixed content (HTTPS->HTTP)
+    const baseUrl = config.glpi.baseUrl;
+    const hint = config.isDev
+      ? 'Verifique se o proxy do Vite esta ativo e se voce esta na VPN da Minerva.'
+      : `Verifique:\n  - voce esta conectado a VPN/intranet da Minerva (o GLPI ${baseUrl} e interno);\n  - o servidor GLPI esta liberando CORS para a origem ${typeof window !== 'undefined' ? window.location.origin : '(desconhecida)'};\n  - veja docs/INFRA-CORS.md para o pedido tecnico ao TI.`;
+    throw new Error(
+      `Nao foi possivel alcançar o GLPI (${baseUrl}/initSession). ${hint}\n\nDetalhe: ${(err as Error).message}`
+    );
+  }
 
   if (!response.ok) {
     const errorText = await response.text();
