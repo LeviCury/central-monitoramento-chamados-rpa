@@ -132,19 +132,20 @@ npm run dev               # http://localhost:5173
 
 ## Funcionalidades
 
-### KPIs com comparativo
+### KPIs (grid 3×2)
 
-| KPI                    | O que mede                                                                                                              |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Total de Chamados**  | Total no período + Δ% vs período anterior equivalente · mini-pílulas `Inc N · Req N`                                    |
-| **Taxa de Resolução**  | (fechados + solucionados) / total + Δ vs período anterior                                                               |
-| **Chamados em Aberto** | 3 linhas didáticas: `em atendimento` (na nossa mão) · `pendentes` (aguardando externos) · `novos` (não atribuídos)      |
-| **Chamados Parados**   | Em aberto há mais de `VITE_STALE_DAYS` dias (padrão `7`) · subtítulo `Inc N · Req N · Média Xd`                         |
-| **Média de Horas**     | Média de horas trabalhadas por chamado **com apontamento**                                                              |
-| **Saldo de Horas**     | Realizado − Planejado (KPI executivo de capacidade)                                                                     |
+| KPI                    | O que mede                                                                                                              | Tipo       |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------- |
+| **Total de Chamados**  | Total no período + Δ% vs período anterior equivalente · mini-pílulas `Incidente N · Requisição N`                       | comparado  |
+| **Taxa de Resolução**  | `Finalizados / Total` (ex.: `48 de 57`) + porcentagem como subtítulo + Δ vs período anterior                            | comparado  |
+| **Chamados em Aberto** | 3 linhas didáticas: `em atendimento` (na nossa mão) · `pendentes` (aguardando externos) · `novos` (não atribuídos)      | snapshot   |
+| **Média de Horas**     | Média de horas trabalhadas por chamado **com apontamento** (formato `Xh Ym`)                                            | snapshot   |
+| **Saldo de Horas**     | `Realizado − Planejado` — KPI executivo de capacidade (verde = ganho · vermelho = déficit)                              | snapshot   |
+| **Mix do Período**     | Proporção `Incidente vs Requisição` — valor = % da categoria dominante (`~50%` se diff `< 10pp`) · mini-barra segmentada + breakdown numérico | snapshot |
 
 > [!NOTE]
-> Quando há filtro de data ativo, **todos** os KPIs mostram comparativo automático com o período anterior de mesma duração. Os deltas são coloridos por sinal e tom (subir/cair pode ser bom ou ruim dependendo do KPI). O sinal aparece como `+X%` ou `-X%` (ASCII puro) — sem setas unicode que poderiam falhar no PDF.
+> **Comparado** = exibe Δ vs período anterior de mesma duração (`+X%` verde · `-X%` vermelho — ASCII puro, sem setas unicode que falham no PDF).
+> **Snapshot** = só faz sentido o número atual; comparar período a período seria enganoso (ex.: % de incidentes do mês passado não diz nada se o volume mudou).
 
 ### Mini-glossário dos estados
 
@@ -165,7 +166,7 @@ Capturado do campo `14` do GLPI:
 - **Incidente** (vermelho): algo quebrou na operação e precisa de correção
 - **Requisição** (azul): solicitação, melhoria ou projeto
 
-Mostrado em todo o dashboard como mini-pílulas, em um donut dedicado e como filtro chip. No PDF executivo aparece como uma seção própria "Por Tipo de Chamado" com taxa de resolução, parados e em aberto por tipo.
+Mostrado em todo o dashboard como mini-pílulas, em um donut dedicado e como filtro chip. No KPI **Mix do Período** o time vê de relance se está apagando incêndio (incidentes dominam) ou tocando projeto (requisições dominam) — com mini-barra segmentada e headline contextual. No PDF executivo aparece também como uma seção própria "Por Tipo de Chamado" com taxa de resolução, parados e em aberto por tipo.
 
 ### Insights automáticos e ações sugeridas
 
@@ -570,13 +571,13 @@ Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva,
 - **Hero**: bloco navy escuro com:
   - Total de chamados em destaque
   - Delta vs período anterior (`+X%` em verde / `-X%` em vermelho — **sem setas unicode**, só ASCII puro pra renderizar igual em qualquer fonte)
-  - 3 pílulas: `em aberto` · `finalizados` · `parados`
+  - 3 pílulas: `em aberto` · `finalizados` · `resolução %`
 - **Faixa didática** logo abaixo do hero explicando como ler as variações em % (`+X%` subiu · `-X%` caiu · cor verde = direção desejada)
-- **6 KPIs** (3×2) com borda lateral colorida, título small caps, valor grande e badge de delta no canto superior direito. O card **"Em Aberto"** mostra 3 mini-linhas explicativas:
+- **6 KPIs** (3×2) com borda lateral colorida, título small caps e valor grande. Apenas **Total** e **Taxa de Resolução** mostram pílula de delta `vs período anterior`; os demais são snapshots. O card **"Chamados em Aberto"** mostra 3 mini-linhas explicativas:
   - `N em atendimento` — *na nossa mão*
   - `N pendentes` — *aguardando externos (cliente / fornecedor)*
   - `N novos` — *ainda não atribuídos*
-  Os cards **"Total"**, **"Em Aberto"** e **"Parados"** ainda exibem mini-pílulas `Inc N · Req N` no rodapé
+  Os cards **"Total"** e **"Em Aberto"** exibem mini-pílulas `Incidente N · Requisição N` no rodapé. O card **"Mix do Período"** substitui a antiga visão de "tempo no backlog" e renderiza headline contextual + mini-barra segmentada `rose / sky / slate (sem tipo)` + breakdown numérico
 - **Distribuição por Status**: barras horizontais coloridas com `count · %`
 - **Por Tipo de Chamado**: 2 colunas (Incidentes vermelho · Requisições azul) com total, `% do total`, em aberto, parados e taxa de resolução
 - **Top 5 Técnicos**: barras horizontais com paleta variada
