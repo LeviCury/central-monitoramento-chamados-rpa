@@ -101,3 +101,43 @@ export const config = {
 export function isGLPIConfigured(): boolean {
   return Boolean(config.glpi.appToken && config.glpi.authBasic);
 }
+
+let configBannerLogged = false;
+/**
+ * Imprime UMA vez no console um resumo da config carregada.
+ * Crucial em producao: se voce esquecer VITE_RPA_COLLABORATORS no
+ * Vercel, este log mostra "WHITELIST: VAZIA" antes de o painel
+ * comecar a parecer quebrado.
+ */
+export function logConfigBanner(): void {
+  if (configBannerLogged) return;
+  configBannerLogged = true;
+  const collabs = config.collaborators.map(c => c.canonical);
+  const lines = [
+    '[config] === resumo da configuracao carregada ===',
+    `  modo: ${isDev ? 'DEV (proxy /api/glpi)' : 'PROD (direto na URL publica do GLPI)'}`,
+    `  glpi.baseUrl: ${config.glpi.baseUrl}`,
+    `  glpi.entityId: ${config.glpi.entityId ?? '(nao filtrar)'}`,
+    `  glpi.defaultGroupId: ${config.glpi.defaultGroupId}`,
+    `  glpi.appToken: ${config.glpi.appToken ? 'OK' : 'AUSENTE !!'}`,
+    `  glpi.authBasic: ${config.glpi.authBasic ? 'OK' : 'AUSENTE !!'}`,
+    `  glpi.plannedCategoryId: ${config.glpi.plannedTaskCategoryId}`,
+    `  glpi.realizedCategoryId: ${config.glpi.realizedTaskCategoryId}`,
+    `  collaborators (whitelist): ${
+      collabs.length === 0
+        ? 'VAZIA -> aceitando TODOS os colaboradores nas tasks'
+        : `${collabs.length} -> [${collabs.join(' | ')}]`
+    }`,
+    `  ui.maxTicketsForHours: ${config.ui.maxTicketsForHours}`,
+    `  ui.staleThresholdDays: ${config.ui.staleThresholdDays}`,
+  ];
+  console.log(lines.join('\n'));
+  if (collabs.length === 0) {
+    console.warn(
+      '[config] VITE_RPA_COLLABORATORS nao esta definida. ' +
+        'O painel vai mostrar TODAS as horas de TODAS as pessoas que apontaram nos chamados. ' +
+        'Para restringir aa equipe RPA, adicione no Vercel: ' +
+        'VITE_RPA_COLLABORATORS="Levi Ribeiro Cury|Igor Martins Minuncio|Guilherme Bretanha|Daniel"'
+    );
+  }
+}

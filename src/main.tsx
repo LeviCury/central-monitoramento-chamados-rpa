@@ -5,6 +5,9 @@ import App from './App.tsx';
 import './index.css';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toaster } from './components/Toaster';
+import { logConfigBanner } from './config';
+
+logConfigBanner();
 
 const queryClient = new QueryClient({
   defaultOptions: {

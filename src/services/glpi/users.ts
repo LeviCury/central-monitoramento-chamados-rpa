@@ -30,7 +30,30 @@ const ALLOWED_COLLABORATOR_MAP = new Map<string, string>(
 
 export const ALLOWED_COLLABORATORS = config.collaborators.map(c => c.canonical);
 
+/**
+ * Retorna true se a whitelist VITE_RPA_COLLABORATORS estiver definida.
+ * Quando false, o painel opera em modo "sem filtro de colaborador":
+ * todas as tasks com tempo apontado contam, sem descartar pessoas
+ * fora da equipe RPA. E preferivel aceitar dados a mais do que
+ * mostrar 0h sem motivo claro.
+ */
+export function isCollaboratorWhitelistConfigured(): boolean {
+  return ALLOWED_COLLABORATOR_MAP.size > 0;
+}
+
+/**
+ * Resolve o nome canonico do colaborador.
+ * - Se whitelist configurada: retorna o nome canonico se houver match,
+ *   ou `null` (task descartada).
+ * - Se whitelist VAZIA: retorna o proprio `name` (aceita todo mundo).
+ *   Isso evita o caso silencioso de "0h em tudo" quando a env var
+ *   nao esta no Vercel.
+ */
 export function getAllowedCollaboratorName(name: string): string | null {
+  if (!isCollaboratorWhitelistConfigured()) {
+    const trimmed = (name || '').trim();
+    return trimmed || null;
+  }
   return ALLOWED_COLLABORATOR_MAP.get(normalizeName(name)) ?? null;
 }
 

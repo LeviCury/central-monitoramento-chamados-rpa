@@ -14,7 +14,11 @@
 import { config } from '../../config';
 import { TicketTaskEntry, TicketTaskKind } from '../../types';
 import { glpiFetch } from './session';
-import { fetchUserName, getAllowedCollaboratorName } from './users';
+import {
+  fetchUserName,
+  getAllowedCollaboratorName,
+  isCollaboratorWhitelistConfigured,
+} from './users';
 import { glpiTicketTaskListSchema } from './schemas';
 
 const ticketTaskCache = new Map<string, TicketTaskEntry[]>();
@@ -45,6 +49,19 @@ async function resolveTaskCollaborator(
 ): Promise<string | null> {
   const taskUser = getTaskUserId(task);
   if (!taskUser) return null;
+
+  const whitelistOn = isCollaboratorWhitelistConfigured();
+
+  // Quando a whitelist NAO esta configurada (env var ausente em prod),
+  // resolvemos sempre o nome real do usuario para mostrar algo
+  // util no breakdown por colaborador, em vez de "15544".
+  if (!whitelistOn) {
+    if (/^\d+$/.test(taskUser)) {
+      const resolved = await fetchUserName(taskUser);
+      return resolved && resolved.trim() ? resolved.trim() : `Tecnico #${taskUser}`;
+    }
+    return taskUser;
+  }
 
   const directMatch = getAllowedCollaboratorName(taskUser);
   if (directMatch) return directMatch;
