@@ -417,6 +417,17 @@ interface KpiCard {
   subtitleLines?: Array<{ value: string; label: string; hint?: string; alert?: boolean }>;
   /** Mini-pílulas Inc/Req embutidas no rodapé do card. */
   typeBreakdown?: TypeBreakdown;
+  /**
+   * Mini barra horizontal segmentada Incidente/Requisição/Sem tipo —
+   * alternativa visual ao `typeBreakdown` quando o card e dedicado ao
+   * mix do periodo. Inclui headline descritiva.
+   */
+  mixBar?: {
+    incident: number;
+    request: number;
+    unknown: number;
+    headline: string;
+  };
   color: RGB;
   delta?: number | null;
   /** Quando true, subir é ruim (ex.: chamados parados, em aberto). */
@@ -551,6 +562,55 @@ function drawKpiCard(
     const subLines = pdf.splitTextToSize(c.subtitle, innerWidth);
     pdf.text(subLines, innerLeft, cursorY + 2);
     cursorY += 2 + subLines.length * 4.2;
+  }
+
+  // Mini barra horizontal Incidente / Requisição (mix do periodo)
+  if (c.mixBar) {
+    cursorY += 2;
+    const total = c.mixBar.incident + c.mixBar.request + c.mixBar.unknown;
+    const barH = 2.2;
+    const barW = innerWidth;
+
+    // Headline (1 linha) — descricao do dominante
+    setColor(pdf, BRAND.text);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7.5);
+    const hLines = pdf.splitTextToSize(c.mixBar.headline, innerWidth);
+    pdf.text(hLines[0], innerLeft, cursorY + 1);
+    cursorY += 4;
+
+    // Track (fundo cinza claro)
+    setFill(pdf, [225, 229, 235]);
+    pdf.roundedRect(innerLeft, cursorY, barW, barH, barH / 2, barH / 2, 'F');
+
+    // Segmentos coloridos (rose / sky / slate)
+    if (total > 0) {
+      let xCursor = innerLeft;
+      const segs: Array<[number, RGB]> = [
+        [c.mixBar.incident, BRAND.red],
+        [c.mixBar.request, BRAND.blue],
+        [c.mixBar.unknown, BRAND.slate],
+      ];
+      for (const [count, color] of segs) {
+        const segW = (count / total) * barW;
+        if (segW <= 0) continue;
+        setFill(pdf, color);
+        pdf.rect(xCursor, cursorY, segW, barH, 'F');
+        xCursor += segW;
+      }
+    }
+    cursorY += barH + 2;
+
+    // Breakdown numerico (1 linha)
+    setColor(pdf, BRAND.muted);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(7);
+    const incTxt = `${c.mixBar.incident} incidente${c.mixBar.incident === 1 ? '' : 's'}`;
+    const reqTxt = `${c.mixBar.request} requisi${c.mixBar.request === 1 ? 'ção' : 'ções'}`;
+    const unkTxt =
+      c.mixBar.unknown > 0 ? `  ·  ${c.mixBar.unknown} sem tipo` : '';
+    pdf.text(`${incTxt}  ·  ${reqTxt}${unkTxt}`, innerLeft, cursorY + 2);
+    cursorY += 4;
   }
 
   // Linha de delta (apenas onde a comparação faz sentido)
@@ -1177,6 +1237,35 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
   const m = input.metrics;
   const d = input.delta?.deltas;
 
+  // Mix do período (Incidente vs Requisição) — calculado uma vez
+  const mix = m.totalByType;
+  const mixTotal = mix.incident + mix.request + mix.unknown;
+  const mixIncPct = mixTotal > 0 ? (mix.incident / mixTotal) * 100 : 0;
+  const mixReqPct = mixTotal > 0 ? (mix.request / mixTotal) * 100 : 0;
+  const mixDiff = Math.abs(mixIncPct - mixReqPct);
+  const mixDominant: 'incident' | 'request' | 'balanced' | 'empty' =
+    mixTotal === 0
+      ? 'empty'
+      : mixDiff < 10
+        ? 'balanced'
+        : mixIncPct > mixReqPct
+          ? 'incident'
+          : 'request';
+  const mixHeadline =
+    mixDominant === 'incident'
+      ? 'Incidentes dominam — operação reativa'
+      : mixDominant === 'request'
+        ? 'Requisições dominam — projetos e melhorias'
+        : mixDominant === 'balanced'
+          ? 'Demanda balanceada entre incidente e requisição'
+          : 'Sem chamados no período';
+  const mixValue =
+    mixDominant === 'empty'
+      ? '—'
+      : mixDominant === 'balanced'
+        ? '~50%'
+        : `${Math.round(Math.max(mixIncPct, mixReqPct))}%`;
+
   // IMPORTANTE: só passamos `delta` em KPIs onde comparar com o período
   // anterior é informativo (Total e Taxa de Resolução). Os demais KPIs
   // são *snapshots* — comparar valores pontuais vira ruído sem
@@ -1252,31 +1341,14 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
             : BRAND.slate,
     },
     {
-      title: 'Tempo no Backlog',
-      value: `${m.avgDaysOpen.toFixed(1)}d`,
-      subtitleLines: [
-        {
-          value: String(m.inProgress + m.pending),
-          label: 'Em aberto agora',
-          hint: 'em atendimento + pendentes',
-        },
-        ...(m.staleCount > 0
-          ? [
-              {
-                value: String(m.staleCount),
-                label: `Acima do limite de ${m.staleThresholdDays}d`,
-                hint: 'vale revisar prioridade ou fechamento',
-                alert: true,
-              },
-            ]
-          : [
-              {
-                value: String(m.staleThresholdDays),
-                label: `dias é o limite saudável`,
-                hint: 'nenhum chamado acima desse prazo',
-              },
-            ]),
-      ],
+      title: 'Mix do Período',
+      value: mixValue,
+      mixBar: {
+        incident: mix.incident,
+        request: mix.request,
+        unknown: mix.unknown,
+        headline: mixHeadline,
+      },
       color: BRAND.navy,
       // sem delta — KPI snapshot
     },

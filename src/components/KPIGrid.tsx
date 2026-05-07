@@ -1,9 +1,8 @@
 import {
-  AlarmClock,
-  CalendarClock,
   CheckCircle,
   Clock,
   HelpCircle,
+  PieChart,
   TrendingDown,
   TrendingUp,
   Users,
@@ -94,49 +93,77 @@ function OpenSubtitle({ inProgress, pending, newTickets }: OpenSubtitleProps) {
   );
 }
 
-interface BacklogSubtitleProps {
-  staleCount: number;
-  staleThresholdDays: number;
-  inProgress: number;
-  pending: number;
+type MixDominant = 'incident' | 'request' | 'balanced' | 'empty';
+
+interface MixSubtitleProps {
+  incident: number;
+  request: number;
+  unknown: number;
+  dominant: MixDominant;
 }
 
-function BacklogSubtitle({
-  staleCount,
-  staleThresholdDays,
-  inProgress,
-  pending,
-}: BacklogSubtitleProps) {
-  const aboveLimitTooltip = `Chamados em aberto há mais de ${staleThresholdDays} dias — vale revisar prioridade ou fechamento.`;
+function MixSubtitle({ incident, request, unknown, dominant }: MixSubtitleProps) {
+  const total = incident + request + unknown;
+  if (total === 0) {
+    return <p className="text-sm text-white/80">Sem chamados no período</p>;
+  }
+  const incPct = (incident / total) * 100;
+  const reqPct = (request / total) * 100;
+  const unkPct = (unknown / total) * 100;
+  const headline =
+    dominant === 'incident'
+      ? 'Incidentes dominam — operação reativa'
+      : dominant === 'request'
+        ? 'Requisições dominam — projetos e melhorias'
+        : 'Demanda balanceada entre incidente e requisição';
   return (
-    <div className="space-y-1.5">
-      <p className="text-xs text-white/85 leading-snug">
-        Idade média dos chamados em aberto
-      </p>
-      <div className="flex flex-wrap gap-1.5 pt-1">
-        <span
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/15 text-[10px] text-white/90"
-          title="Chamados na nossa mão"
-        >
-          <span className="font-semibold tabular-nums">{inProgress}</span> em atendimento
-        </span>
-        <span
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/15 text-[10px] text-white/90"
-          title="Aguardando algo externo (cliente / fornecedor)"
-        >
-          <span className="font-semibold tabular-nums">{pending}</span> pendentes
-        </span>
+    <div className="space-y-2">
+      <p className="text-xs text-white/85 leading-snug">{headline}</p>
+      <div
+        className="h-2 w-full rounded-full bg-white/15 overflow-hidden flex"
+        role="img"
+        aria-label={`Distribuição: ${incident} incidente${incident === 1 ? '' : 's'}, ${request} requisição${request === 1 ? '' : 'ões'}${unknown ? `, ${unknown} sem tipo` : ''}`}
+      >
+        {incPct > 0 && (
+          <div
+            className="h-full bg-rose-300"
+            style={{ width: `${incPct}%` }}
+            title={`${incident} incidente${incident === 1 ? '' : 's'}`}
+          />
+        )}
+        {reqPct > 0 && (
+          <div
+            className="h-full bg-sky-300"
+            style={{ width: `${reqPct}%` }}
+            title={`${request} requisição${request === 1 ? '' : 'ões'}`}
+          />
+        )}
+        {unkPct > 0 && (
+          <div
+            className="h-full bg-white/40"
+            style={{ width: `${unkPct}%` }}
+            title={`${unknown} sem tipo`}
+          />
+        )}
       </div>
-      {staleCount > 0 && (
-        <p
-          className="flex items-center gap-1.5 pt-1.5 mt-1 border-t border-white/15 text-[11px] text-rose-50 leading-snug"
-          title={aboveLimitTooltip}
-        >
-          <AlarmClock className="w-3.5 h-3.5 text-rose-100 shrink-0" aria-hidden />
-          <span className="font-semibold tabular-nums">{staleCount}</span>
-          <span>acima do limite de {staleThresholdDays}d</span>
-        </p>
-      )}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/85">
+        <span className="inline-flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-300" aria-hidden />
+          <span className="font-semibold tabular-nums">{incident}</span>{' '}
+          incidente{incident === 1 ? '' : 's'}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-300" aria-hidden />
+          <span className="font-semibold tabular-nums">{request}</span>{' '}
+          requisi{request === 1 ? 'ção' : 'ções'}
+        </span>
+        {unknown > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-white/40" aria-hidden />
+            <span className="font-semibold tabular-nums">{unknown}</span> sem tipo
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -158,6 +185,27 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
   const iconClass = large ? 'w-8 h-8' : 'w-6 h-6';
   const hasComparison = delta.previous !== null;
 
+  // Mix do período (Incidente vs Requisição)
+  const mix = metrics.totalByType;
+  const mixTotal = mix.incident + mix.request + mix.unknown;
+  const mixIncPct = mixTotal > 0 ? (mix.incident / mixTotal) * 100 : 0;
+  const mixReqPct = mixTotal > 0 ? (mix.request / mixTotal) * 100 : 0;
+  const mixDiff = Math.abs(mixIncPct - mixReqPct);
+  const mixDominant: MixDominant =
+    mixTotal === 0
+      ? 'empty'
+      : mixDiff < 10
+        ? 'balanced'
+        : mixIncPct > mixReqPct
+          ? 'incident'
+          : 'request';
+  const mixValue =
+    mixDominant === 'empty'
+      ? '—'
+      : mixDominant === 'balanced'
+        ? '~50%'
+        : `${Math.round(Math.max(mixIncPct, mixReqPct))}%`;
+
   return (
     <div className="space-y-3">
       {hasComparison && !large && (
@@ -165,8 +213,8 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-hidden />
           <span>
             Variações em <strong>%</strong> aparecem apenas em KPIs onde a comparação faz sentido
-            (Total e Taxa de Resolução). KPIs de snapshot — em aberto, médias, saldo e tempo no
-            backlog — mostram apenas o número atual.
+            (Total e Taxa de Resolução). KPIs de snapshot — em aberto, médias, saldo e mix do
+            período — mostram apenas o número atual.
           </span>
         </div>
       )}
@@ -239,17 +287,17 @@ export function KPIGrid({ metrics, delta, loadingHours, large = false }: KPIGrid
           loading={loadingHours}
         />
         <KPICard
-          title="Tempo no Backlog"
-          value={`${metrics.avgDaysOpen.toFixed(1)}d`}
+          title="Mix do Período"
+          value={mixValue}
           subtitleNode={
-            <BacklogSubtitle
-              staleCount={metrics.staleCount}
-              staleThresholdDays={metrics.staleThresholdDays}
-              inProgress={metrics.inProgress}
-              pending={metrics.pending}
+            <MixSubtitle
+              incident={mix.incident}
+              request={mix.request}
+              unknown={mix.unknown}
+              dominant={mixDominant}
             />
           }
-          icon={<CalendarClock className={iconClass} aria-hidden />}
+          icon={<PieChart className={iconClass} aria-hidden />}
           color="navy"
           delay={5}
           large={large}
