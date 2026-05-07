@@ -708,22 +708,54 @@ O filtro de fila não está casando — o GLPI está devolvendo o universo até 
 </details>
 
 <details>
-<summary><b>Em produção (Vercel) o painel mostra "0 chamados" ou erro "Failed to fetch"</b></summary>
+<summary><b>Em produção (Vercel) o painel mostra "0 chamados" mas SEM erro nenhum no console</b></summary>
 <br/>
 
-Cenário típico: GLPI da Minerva é **intranet** (só responde com VPN), então o navegador bloqueia a chamada por **CORS** ou simplesmente não consegue alcançar o host quando o usuário está fora da VPN.
+**Causa #1 (95% dos casos): você setou `VITE_GLPI_ENTITY_ID` igual ao `VITE_GLPI_GROUP_ID`.**
 
-**Diagnóstico em 30s:**
+`108` na Minerva é o ID do **grupo técnico** (RPA), não de uma entidade. Quando você coloca `108` em ambos, o GLPI procura tickets em uma entidade que não existe e devolve 0 chamados — sem erro, porque tecnicamente a busca foi um sucesso.
 
-1. Abra o DevTools no domínio do Vercel → **Console**: se aparecer `TypeError: Failed to fetch` ou `CORS policy: No 'Access-Control-Allow-Origin' header`, é isto.
-2. Confirme que o usuário está conectado à VPN/intranet Minerva. Sem VPN, nem com CORS perfeito o navegador alcança o GLPI.
-3. Teste no celular pelo 4G (sem VPN): se `https://central.minervafoods.com/apirest.php` não abre, o GLPI é interno mesmo.
+**Como confirmar:** abra o DevTools → Console no Vercel. Se aparecer:
+
+```
+[GLPI] Buscando tickets com critérios: {"criteria":[
+  {"link":"AND","field":80,"searchtype":"under","value":"108"},
+  {"link":"AND","field":8,"searchtype":"under","value":"108"},
+  ...
+]}
+[GLPI] Sessão criada com sucesso
+```
+
+…credenciais e CORS estão ok, e os dois `value:"108"` em `field:80` (entidade) e `field:8` (grupo) confirmam o problema. A versão atual do app também imprime um `console.warn` explícito quando detecta isso.
+
+**Fix em 30s:**
+
+1. Vercel → projeto → *Settings → Environment Variables*.
+2. Edite `VITE_GLPI_ENTITY_ID` e deixe **vazio** (ou apague a variável).
+3. *Deployments* → último deploy → `...` → **Redeploy** (env var só aplica em build novo).
+4. Recarregue a página. Os tickets aparecem.
+
+</details>
+
+<details>
+<summary><b>Em produção dá <code>TypeError: Failed to fetch</code> ou erro de CORS</b></summary>
+<br/>
+
+Cenário diferente do anterior: aqui a chamada nem sai do navegador. Causas típicas:
+
+1. **Usuário fora da VPN/intranet** — o GLPI da Minerva é interno; sem VPN o host nem responde.
+2. **CORS não liberado** — o servidor que serve `apirest.php` precisa devolver `Access-Control-Allow-Origin` apontando pro domínio do Vercel.
+
+**Diagnóstico:**
+
+- Teste no celular pelo **4G** (sem VPN): abra `https://central.minervafoods.com/apirest.php` — se não carrega, o GLPI é intranet mesmo.
+- DevTools → Console: `CORS policy: No 'Access-Control-Allow-Origin' header` confirma o item 2.
 
 **Soluções (em ordem de esforço):**
 
-1. **Pedir CORS ao TI**: encaminhe [`docs/INFRA-CORS.md`](docs/INFRA-CORS.md) — tem o pedido técnico pronto, exemplos de configuração para Apache/Nginx/IIS e um `curl` de validação.
-2. **Hospedar dentro da rede Minerva**: 1 VM Linux/Windows com Node ≥ 18 (ou Docker) já basta. Recursos mínimos: 1 vCPU, 512 MB RAM. Nesse cenário, configure um proxy reverso `/api/glpi/*` → `https://central.minervafoods.com/apirest.php/*` e ajuste `src/config.ts` para apontar `baseUrl` para `/api/glpi` também em produção. Sem CORS, sem credenciais no bundle.
-3. **Túnel reverso aprovado** (Cloudflare Tunnel / Tailscale Funnel): publica o GLPI em endpoint controlado. Requer apreciação de segurança.
+1. **Pedir CORS ao TI**: encaminhe [`docs/INFRA-CORS.md`](docs/INFRA-CORS.md) — tem o pedido técnico pronto, exemplos para Apache/Nginx/IIS e um `curl` de validação.
+2. **Hospedar dentro da rede Minerva**: 1 VM ou container Docker basta. Configure proxy reverso `/api/glpi/*` → `https://central.minervafoods.com/apirest.php/*` e aponte `src/config.ts` `baseUrl` para `/api/glpi` em produção também. Sem CORS, sem credenciais no bundle.
+3. **Túnel reverso aprovado** (Cloudflare Tunnel / Tailscale Funnel). Requer aval de segurança.
 
 </details>
 

@@ -34,6 +34,27 @@ export interface GLPISearchParams {
   signal?: AbortSignal;
 }
 
+/**
+ * Pega de canto a configuracao classica errada de mandar o mesmo ID em
+ * VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID — geralmente o user pensou
+ * que "108" era a entidade quando na verdade e o grupo tecnico, e o
+ * GLPI devolve 0 chamados sem erro nenhum (a entidade simplesmente
+ * nao existe). Loga uma vez por sessao no console.
+ */
+let warnedAboutDuplicatedId = false;
+function warnIfEntityEqualsGroup(entityValue: string | null, groupValue: string | null) {
+  if (warnedAboutDuplicatedId) return;
+  if (!entityValue || !groupValue) return;
+  if (entityValue !== groupValue) return;
+  warnedAboutDuplicatedId = true;
+  console.warn(
+    `[GLPI] VITE_GLPI_ENTITY_ID e VITE_GLPI_GROUP_ID estao com o mesmo valor (${entityValue}). ` +
+      'Isso quase sempre e bug de configuracao: 108 e o ID do GRUPO tecnico, nao da entidade. ' +
+      'Se voce esta vendo "0 chamados" sem erro, deixe VITE_GLPI_ENTITY_ID vazio (apenas grupo basta). ' +
+      'Veja docs/INFRA-CORS.md / .env.example.'
+  );
+}
+
 function buildSearchCriteria(params: GLPISearchParams): object[] {
   const criteria: object[] = [];
 
@@ -43,6 +64,9 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
   // No GLPI, `equals` em entity costuma exigir o ID interno em vez do nome,
   // e algumas instalações ignoram o critério silenciosamente.
   const entityValue = params.entityId || config.glpi.entityId;
+  const groupValue = params.groupId || config.glpi.defaultGroupId;
+  warnIfEntityEqualsGroup(entityValue, groupValue);
+
   if (entityValue) {
     criteria.push({
       link: 'AND',
@@ -55,7 +79,6 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
   // E também por grupo técnico (campo 8) — fila do RPA.
   // `under` (grupo + subgrupos) é mais robusto que `equals`,
   // que em algumas instalações do GLPI é silenciosamente ignorado.
-  const groupValue = params.groupId || config.glpi.defaultGroupId;
   if (groupValue) {
     criteria.push({
       link: 'AND',
