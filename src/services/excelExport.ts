@@ -644,7 +644,7 @@ export async function exportToExcel({
     'Em Aberto',
     'Finalizados',
     'Taxa Resolução',
-    'Parados',
+    'Antigos (>limite)',
     'Média dias em aberto',
     'Horas realizadas',
     'Média horas/chamado',
@@ -723,7 +723,7 @@ export async function exportToExcel({
     { width: 14 }, // Pendente
     { width: 12 }, // Novo
     { width: 14 }, // Finalizados
-    { width: 12 }, // Parados
+    { width: 16 }, // Antigos (>limite)
     { width: 18 }, // Taxa Resolução
     { width: 3 },
   ];
@@ -751,7 +751,7 @@ export async function exportToExcel({
     'Pendente',
     'Novo',
     'Finalizados',
-    'Parados',
+    'Antigos (>limite)',
     'Taxa Resolução',
   ];
   const typeHeaderRow = typeSheet.getRow(5);
@@ -885,7 +885,7 @@ export async function exportToExcel({
     ['Pendente', 'Aguardando algo externo (cliente / fornecedor / outro time).'],
     ['Novo', 'Criado mas ainda não foi atribuído a um técnico.'],
     ['Finalizado', 'Solucionado ou Fechado.'],
-    ['Parado', `Em aberto há mais de ${metrics.staleThresholdDays} dias.`],
+    ['Antigo (>limite)', `Em aberto há mais de ${metrics.staleThresholdDays} dias — vale revisar prioridade ou fechamento.`],
   ];
   for (const [term, desc] of glossEntries) {
     const tCell = typeSheet.getCell(`B${glossY}`);

@@ -809,7 +809,7 @@ export const generateActionItems = (
     out.push({
       id: 'review-stale',
       severity: metrics.staleCount > 5 ? 'high' : 'medium',
-      title: `Revisar ${metrics.staleCount} chamado${metrics.staleCount === 1 ? '' : 's'} parado${metrics.staleCount === 1 ? '' : 's'}`,
+      title: `Revisar ${metrics.staleCount} chamado${metrics.staleCount === 1 ? '' : 's'} aberto${metrics.staleCount === 1 ? '' : 's'} há mais de ${staleThresholdDays}d`,
       description: `Em aberto há mais de ${staleThresholdDays} dias. Avaliar se ainda têm prioridade ou se deveriam ser fechados.`,
       filter: {
         statuses: ['Novo', 'Em Atendimento (atribuído)', 'Em Atendimento (planejado)', 'Pendente'],

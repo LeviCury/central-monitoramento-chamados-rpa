@@ -425,7 +425,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                             title={`Em aberto há ${Math.floor(stale.daysOpen)} dias`}
                           >
                             <AlarmClock className="w-3 h-3" aria-hidden />
-                            Parado há {Math.floor(stale.daysOpen)}d
+                            Aberto há {Math.floor(stale.daysOpen)}d
                           </span>
                         )}
                         {hoursWarning && (

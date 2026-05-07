@@ -538,10 +538,10 @@ function drawKpiCard(
         pdf.setFontSize(6.5);
         setColor(pdf, line.alert ? BRAND.redDark : BRAND.muted);
         const hintLines = pdf.splitTextToSize(line.hint, innerWidth - (line.alert ? 3 : 0));
-        pdf.text(hintLines[0], lineLeft, cursorY + 3.2);
-        cursorY += 7.5;
+        pdf.text(hintLines[0], lineLeft, cursorY + 3);
+        cursorY += 6.6;
       } else {
-        cursorY += 4.8;
+        cursorY += 4.2;
       }
     }
   } else if (c.subtitle) {
@@ -635,6 +635,7 @@ function drawHeroBlock(
   const pills = [
     { label: 'em aberto', value: metrics.open.toLocaleString('pt-BR'), color: BRAND.amber },
     { label: 'finalizados', value: metrics.finalized.toLocaleString('pt-BR'), color: BRAND.green },
+    { label: 'resolução', value: `${metrics.closureRate}%`, color: BRAND.blue },
   ];
   let pillX = blockX + blockW - 6;
   for (let i = pills.length - 1; i >= 0; i--) {
@@ -898,7 +899,7 @@ function drawTypeBreakdownSection(
     const closure = b.total > 0 ? Math.round((b.finalized / b.total) * 100) : 0;
     const stats = [
       { label: 'em aberto', value: String(b.open), color: BRAND.amber },
-      { label: 'parados', value: String(b.stale), color: b.stale > 0 ? BRAND.red : BRAND.green },
+      { label: 'antigos', value: String(b.stale), color: b.stale > 0 ? BRAND.red : BRAND.green },
       { label: 'resolução', value: `${closure}%`, color: BRAND.green },
     ];
 
@@ -1059,28 +1060,21 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
   // Legenda didática explicando as %
   y = drawDidacticLegend(pdf, y);
 
-  // KPIs: 5 cards no total. Linha 1 com 3 cards (Total, Taxa, Em Aberto)
-  // ocupando a largura toda; linha 2 com 2 cards (Média / Saldo) também
-  // preenchendo a largura toda — sem buracos visuais.
+  // KPIs: 6 cards em grid 3x2 — todos com a mesma largura para alinhamento
+  // visual perfeito. Altura confortavel (54mm) para acomodar com folga as
+  // 3 linhas didaticas + delta + pilulas Inc/Req sem aperto.
   const gap = 5;
-  const kpiH = 48;
+  const kpiH = 54;
   const totalW = PAGE.w - PAGE.margin * 2;
-  const kpiW3 = (totalW - gap * 2) / 3;
-  const kpiW2 = (totalW - gap) / 2;
+  const kpiW = (totalW - gap * 2) / 3;
   const cards = buildKpiCards(input);
 
-  // Linha 1 (3 cards)
-  for (let i = 0; i < 3 && i < cards.length; i++) {
-    const cx = PAGE.margin + i * (kpiW3 + gap);
-    const cy = y;
-    drawKpiCard(pdf, cx, cy, kpiW3, kpiH, cards[i]);
-  }
-  // Linha 2 (2 cards mais largos)
-  for (let i = 3; i < cards.length; i++) {
-    const idx = i - 3;
-    const cx = PAGE.margin + idx * (kpiW2 + gap);
-    const cy = y + kpiH + gap;
-    drawKpiCard(pdf, cx, cy, kpiW2, kpiH, cards[i]);
+  for (let i = 0; i < cards.length; i++) {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    const cx = PAGE.margin + col * (kpiW + gap);
+    const cy = y + row * (kpiH + gap);
+    drawKpiCard(pdf, cx, cy, kpiW, kpiH, cards[i]);
   }
   y += kpiH * 2 + gap + 8;
 
@@ -1185,9 +1179,8 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
 
   // IMPORTANTE: só passamos `delta` em KPIs onde comparar com o período
   // anterior é informativo (Total e Taxa de Resolução). Os demais KPIs
-  // são *snapshots* (em aberto, médias, saldo) — comparar valores
-  // pontuais vira ruído sem informação real. Mantemos só o número.
-  // O alerta de chamados parados aparece como 4a linha do card "Em Aberto".
+  // são *snapshots* — comparar valores pontuais vira ruído sem
+  // informação real. Mantemos só o número.
   return [
     {
       title: 'Total de Chamados',
@@ -1200,8 +1193,9 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
     },
     {
       title: 'Taxa de Resolução',
-      value: `${m.closureRate}%`,
-      subtitle: `${m.finalized} finalizados de ${m.total}`,
+      // Valor principal: contagem absoluta (mais "executiva" do que só %)
+      value: `${m.finalized} de ${m.total}`,
+      subtitle: `${m.closureRate}% finalizados no período`,
       color: BRAND.green,
       delta: d?.closureRate ?? null,
     },
@@ -1224,16 +1218,6 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
           label: 'Novos',
           hint: 'ainda não atribuídos',
         },
-        ...(m.staleCount > 0
-          ? [
-              {
-                value: String(m.staleCount),
-                label: 'Parados',
-                hint: `há mais de ${m.staleThresholdDays} dias — revisar`,
-                alert: true,
-              },
-            ]
-          : []),
       ],
       typeBreakdown: m.openByType,
       color: BRAND.amber,
@@ -1266,6 +1250,35 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
           : m.hoursBalanceType === 'gain'
             ? BRAND.green
             : BRAND.slate,
+    },
+    {
+      title: 'Tempo no Backlog',
+      value: `${m.avgDaysOpen.toFixed(1)}d`,
+      subtitleLines: [
+        {
+          value: String(m.inProgress + m.pending),
+          label: 'Em aberto agora',
+          hint: 'em atendimento + pendentes',
+        },
+        ...(m.staleCount > 0
+          ? [
+              {
+                value: String(m.staleCount),
+                label: `Acima do limite de ${m.staleThresholdDays}d`,
+                hint: 'vale revisar prioridade ou fechamento',
+                alert: true,
+              },
+            ]
+          : [
+              {
+                value: String(m.staleThresholdDays),
+                label: `dias é o limite saudável`,
+                hint: 'nenhum chamado acima desse prazo',
+              },
+            ]),
+      ],
+      color: BRAND.navy,
+      // sem delta — KPI snapshot
     },
   ];
 }

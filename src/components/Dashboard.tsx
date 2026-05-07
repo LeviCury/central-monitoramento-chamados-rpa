@@ -122,7 +122,7 @@ export default function Dashboard() {
     }));
     if (item.filter.staleOnly) {
       pushToast(
-        `Filtro aplicado. Ordene a coluna "Data Abertura" para ver os parados há mais de ${metrics.staleThresholdDays} dias.`,
+        `Filtro aplicado. Ordene a coluna "Data Abertura" para ver os chamados abertos há mais de ${metrics.staleThresholdDays} dias.`,
         'success',
         5000
       );

@@ -204,7 +204,7 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
                     format={v => `${v}%`}
                   />
                   <MetricRow
-                    label="Chamados parados"
+                    label="Abertos há muito tempo"
                     values={metrics.map(m => m.staleCount)}
                     highlight="low"
                     format={v => v.toLocaleString('pt-BR')}
@@ -235,7 +235,7 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
           {metrics.length > 0 && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Destaque verde: melhor valor (maior em produtividade, menor em itens negativos como
-              parados ou tempo médio).
+              chamados antigos ou tempo médio).
             </p>
           )}
         </div>
