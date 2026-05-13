@@ -1,5 +1,5 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertOctagon, RefreshCw } from 'lucide-react';
+import { AlertOctagon, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -7,12 +7,13 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   error: Error | null;
+  showStack: boolean;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  state: ErrorBoundaryState = { error: null };
+  state: ErrorBoundaryState = { error: null, showStack: false };
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { error };
   }
 
@@ -25,31 +26,77 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (typeof window !== 'undefined') window.location.reload();
   };
 
+  toggleStack = () => {
+    this.setState(s => ({ showStack: !s.showStack }));
+  };
+
   render() {
     if (this.state.error) {
+      const { error, showStack } = this.state;
       return (
         <div
           role="alert"
-          className="min-h-screen flex flex-col items-center justify-center p-6 bg-minerva-gradient text-white"
+          className="relative min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--bg-base)]"
         >
-          <div className="max-w-xl text-center bg-white/10 border border-white/20 rounded-2xl p-8 backdrop-blur-md">
-            <AlertOctagon className="w-12 h-12 mx-auto text-minerva-red mb-4" aria-hidden />
-            <h1 className="text-2xl font-bold mb-2">Algo deu errado</h1>
-            <p className="text-white/70 mb-6">
-              Tivemos um problema inesperado ao carregar o dashboard. A equipe técnica
-              já foi notificada nos logs.
+          <div className="relative z-10 w-full max-w-xl text-center animate-fade-in-up">
+            <div className="surface-elevated rounded-3xl p-10">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 mb-5">
+                <AlertOctagon className="w-6 h-6" aria-hidden />
+              </div>
+
+              <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[var(--text-primary)] mb-2">
+                Algo deu errado
+              </h1>
+              <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-6 max-w-md mx-auto">
+                Tivemos um problema inesperado ao carregar o dashboard. A equipe técnica
+                já foi notificada nos logs do navegador.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={this.handleReload}
+                  className="primary-btn justify-center"
+                >
+                  <RefreshCw className="w-4 h-4" aria-hidden />
+                  Recarregar
+                </button>
+                <button
+                  type="button"
+                  onClick={this.toggleStack}
+                  aria-expanded={showStack}
+                  className="ghost-btn justify-center"
+                >
+                  {showStack ? (
+                    <>
+                      <ChevronUp className="w-4 h-4" aria-hidden />
+                      Ocultar detalhes
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4" aria-hidden />
+                      Ver detalhes técnicos
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {showStack && (
+                <div className="mt-6 text-left rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)] overflow-hidden">
+                  <div className="px-4 py-2 border-b border-[var(--border-subtle)] text-[10px] uppercase tracking-wider-2 text-[var(--text-tertiary)] font-semibold">
+                    Mensagem de erro
+                  </div>
+                  <pre className="px-4 py-3 text-xs text-rose-600 dark:text-rose-400 whitespace-pre-wrap break-words max-h-48 overflow-auto leading-relaxed font-mono">
+                    {error.message}
+                    {error.stack && '\n\n' + error.stack}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            <p className="mt-4 text-xs text-[var(--text-tertiary)]">
+              Minerva Foods · Central de Monitoramento RPA
             </p>
-            <pre className="text-left text-xs bg-black/30 p-4 rounded-xl overflow-auto max-h-40 mb-6">
-              {this.state.error.message}
-            </pre>
-            <button
-              type="button"
-              onClick={this.handleReload}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-minerva-red hover:bg-minerva-red-dark rounded-xl font-medium transition-colors"
-            >
-              <RefreshCw className="w-4 h-4" aria-hidden />
-              Recarregar
-            </button>
           </div>
         </div>
       );

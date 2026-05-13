@@ -23,12 +23,30 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- Theme Color -->
-    <meta name="theme-color" content="#1D2E40" />
+    <!-- Preload do peso 700 (mais usado em headings/KPI numbers) p/ evitar FOUT -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Theme Color (light/dark variants) -->
+    <meta
+      name="theme-color"
+      content="#f4f6fb"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0E1822"
+      media="(prefers-color-scheme: dark)"
+    />
     <meta name="msapplication-navbutton-color" content="#1D2E40" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="#1D2E40" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
     <style>
       body {

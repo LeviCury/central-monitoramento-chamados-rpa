@@ -1,6 +1,15 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { PieChart } from 'lucide-react';
 import { useTheme } from '../contexts/useTheme';
+import {
+  ChartCard,
+  ChartGradients,
+  GlassTooltip,
+  fillForStatus,
+  getAxisProps,
+  getGridStroke,
+  getCursorFill,
+} from './charts/chartTheme';
 
 interface StatusChartProps {
   data: { status: string; count: number }[];
@@ -8,123 +17,93 @@ interface StatusChartProps {
   selectedStatuses?: string[];
 }
 
-// Cores com a paleta Minerva - Light Mode
-const STATUS_COLORS_LIGHT: Record<string, string> = {
-  'Fechado': '#10b981',
-  'Solucionado': '#1D2E40',
-  'Novo': '#8b5cf6',
-  'Em Atendimento (atribuído)': '#F84454',
-  'Em Atendimento (planejado)': '#f59e0b',
-  'Pendente': '#ef4444',
-};
-
-// Cores para Dark Mode (mais vibrantes)
-const STATUS_COLORS_DARK: Record<string, string> = {
-  'Fechado': '#34d399',
-  'Solucionado': '#60a5fa',
-  'Novo': '#a78bfa',
-  'Em Atendimento (atribuído)': '#F84454',
-  'Em Atendimento (planejado)': '#fbbf24',
-  'Pendente': '#f87171',
-};
-
-const DEFAULT_COLOR_LIGHT = '#94a3b8';
-const DEFAULT_COLOR_DARK = '#cbd5e1';
-
 function formatStatus(status: string): string {
   if (!status) return 'Desconhecido';
-  
   const abbreviations: Record<string, string> = {
     'Em Atendimento (atribuído)': 'Em Atend. (atrib.)',
     'Em Atendimento (planejado)': 'Em Atend. (plan.)',
   };
-  
   return abbreviations[status] || status;
 }
 
 export default function StatusChart({ data, onSelectStatus, selectedStatuses }: StatusChartProps) {
   const { isDark } = useTheme();
   const selectedSet = new Set(selectedStatuses ?? []);
-  
-  const statusColors = isDark ? STATUS_COLORS_DARK : STATUS_COLORS_LIGHT;
-  const defaultColor = isDark ? DEFAULT_COLOR_DARK : DEFAULT_COLOR_LIGHT;
-  
+
   const chartData = data.map(item => ({
     ...item,
     displayStatus: formatStatus(item.status),
-    color: statusColors[item.status] || defaultColor,
+    color: fillForStatus(item.status),
   }));
 
   const total = chartData.reduce((sum, item) => sum + item.count, 0);
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 h-full">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-minerva-navy/10 dark:bg-white/10 rounded-xl">
-            <PieChart className="w-5 h-5 text-minerva-navy dark:text-white" />
-          </div>
-          <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Distribuição por Status</h2>
-        </div>
-        <div className="flex items-center justify-center h-[280px] text-gray-400 dark:text-gray-500">
+      <ChartCard
+        icon={<PieChart className="w-4 h-4" />}
+        title="Distribuição por Status"
+        subtitle="Sem dados"
+      >
+        <div className="flex items-center justify-center h-[260px] text-minerva-navy/40 dark:text-white/40 text-sm">
           Nenhum dado disponível
         </div>
-      </div>
+      </ChartCard>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 card-hover">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-minerva-navy/10 dark:bg-white/10 rounded-xl">
-            <PieChart className="w-5 h-5 text-minerva-navy dark:text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Distribuição por Status</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{total} chamados no total</p>
-          </div>
-        </div>
-      </div>
-
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={chartData} margin={{ bottom: 20, left: -10 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#475569' : '#e2e8f0'} vertical={false} />
-          <XAxis 
-            dataKey="displayStatus" 
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }} 
+    <ChartCard
+      icon={<PieChart className="w-4 h-4" />}
+      title="Distribuição por Status"
+      subtitle={`${total} chamados no total`}
+    >
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={chartData} margin={{ top: 8, bottom: 18, left: -8, right: 8 }}>
+          <ChartGradients />
+          <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} vertical={false} />
+          <XAxis
+            dataKey="displayStatus"
             angle={-20}
             textAnchor="end"
-            height={60}
+            height={56}
             interval={0}
-            axisLine={{ stroke: isDark ? '#475569' : '#e2e8f0' }}
-            tickLine={false}
+            {...getAxisProps(isDark)}
           />
-          <YAxis 
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }} 
-            allowDecimals={false}
-            axisLine={false}
-            tickLine={false}
-          />
+          <YAxis allowDecimals={false} {...getAxisProps(isDark)} />
           <Tooltip
-            contentStyle={{
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              border: `1px solid ${isDark ? '#475569' : '#e2e8f0'}`,
-              borderRadius: '12px',
-              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-              padding: '12px 16px',
-            }}
-            formatter={(value, _name, props) => [
-              <span style={{ color: isDark ? '#f1f5f9' : '#1D2E40', fontWeight: 600 }}>{value} chamados</span>,
-              <span style={{ color: isDark ? '#94a3b8' : '#64748b' }}>{props.payload.status}</span>
-            ]}
-            labelFormatter={() => ''}
-            cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(29, 46, 64, 0.05)' }}
+            content={
+              <GlassTooltip
+                renderItem={item => {
+                  const payload = item.payload as { status?: string } | undefined;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: item.color,
+                          boxShadow: `0 0 8px ${item.color}66`,
+                        }}
+                        aria-hidden
+                      />
+                      <span className="text-minerva-navy/70 dark:text-white/70 mr-auto">
+                        {payload?.status}
+                      </span>
+                      <span className="font-bold tabular-nums text-minerva-navy dark:text-white">
+                        {item.value}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            }
+            cursor={{ fill: getCursorFill(isDark) }}
           />
           <Bar
             dataKey="count"
             radius={[8, 8, 0, 0]}
-            onClick={(payload) => {
+            animationDuration={800}
+            onClick={payload => {
               const status = (payload as { status?: string }).status;
               if (status && onSelectStatus) onSelectStatus(status);
             }}
@@ -137,7 +116,7 @@ export default function StatusChart({ data, onSelectStatus, selectedStatuses }: 
                 <Cell
                   key={`cell-${index}`}
                   fill={entry.color}
-                  fillOpacity={isDimmed ? 0.35 : 1}
+                  fillOpacity={isDimmed ? 0.30 : 0.92}
                   stroke={isSelected ? '#F84454' : 'none'}
                   strokeWidth={isSelected ? 2 : 0}
                 />
@@ -146,9 +125,9 @@ export default function StatusChart({ data, onSelectStatus, selectedStatuses }: 
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      
-      {/* Legenda clicável (drill-down) */}
-      <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100 dark:border-slate-700">
+
+      {/* Legenda clicável */}
+      <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t border-minerva-navy/8 dark:border-white/8">
         {chartData.map((item, index) => {
           const isSelected = selectedSet.has(item.status);
           return (
@@ -158,30 +137,37 @@ export default function StatusChart({ data, onSelectStatus, selectedStatuses }: 
               onClick={() => onSelectStatus?.(item.status)}
               disabled={!onSelectStatus}
               aria-pressed={isSelected}
-              className={`flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-full transition-all ${
+              className={`flex items-center gap-2 text-xs px-2.5 py-1.5 rounded-full border transition-all ${
                 isSelected
-                  ? 'bg-minerva-navy text-white'
-                  : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-600 dark:text-gray-300'
+                  ? 'bg-minerva-navy text-white border-minerva-navy shadow-minerva-sm'
+                  : 'bg-white/40 dark:bg-white/5 border-minerva-navy/8 dark:border-white/10 hover:bg-white/70 dark:hover:bg-white/10 text-minerva-navy/80 dark:text-white/80'
               } ${!onSelectStatus ? 'cursor-default' : 'cursor-pointer'}`}
             >
               <span
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: item.color }}
+                className="w-2.5 h-2.5 rounded-full shrink-0"
+                style={{
+                  backgroundColor: item.color,
+                  boxShadow: isSelected ? 'none' : `0 0 6px ${item.color}55`,
+                }}
                 aria-hidden
               />
               <span>{item.status}</span>
-              <span className={`font-semibold ${isSelected ? 'text-white' : 'text-minerva-navy dark:text-white'}`}>
-                ({item.count})
+              <span
+                className={`font-semibold tabular-nums ${
+                  isSelected ? 'text-white' : 'text-minerva-navy dark:text-white'
+                }`}
+              >
+                {item.count}
               </span>
             </button>
           );
         })}
       </div>
       {onSelectStatus && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-          Dica: clique em um status para filtrar.
+        <p className="text-[11px] text-minerva-navy/45 dark:text-white/45 mt-3">
+          Clique em um status para filtrar.
         </p>
       )}
-    </div>
+    </ChartCard>
   );
 }

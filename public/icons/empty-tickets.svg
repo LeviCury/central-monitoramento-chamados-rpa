@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="paperGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D2E40" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#1D2E40" stop-opacity="0.04"/>
+    </linearGradient>
+    <linearGradient id="paperBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D2E40" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#1D2E40" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="lensGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F84454" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#F84454" stop-opacity="0.05"/>
+    </linearGradient>
+    <radialGradient id="lensGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F84454" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#F84454" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Soft glow -->
+  <circle cx="100" cy="100" r="80" fill="url(#lensGlow)"/>
+
+  <!-- Paper stack (back) -->
+  <rect x="60" y="38" width="86" height="106" rx="10"
+        fill="url(#paperGradient)" stroke="url(#paperBorder)" stroke-width="1.4"
+        transform="rotate(6 103 91)"/>
+
+  <!-- Paper stack (front) -->
+  <rect x="50" y="44" width="86" height="106" rx="10"
+        fill="url(#paperGradient)" stroke="url(#paperBorder)" stroke-width="1.6"/>
+
+  <!-- Paper lines -->
+  <g stroke="#1D2E40" stroke-opacity="0.18" stroke-width="2.2" stroke-linecap="round">
+    <line x1="62" y1="68" x2="116" y2="68"/>
+    <line x1="62" y1="82" x2="124" y2="82"/>
+    <line x1="62" y1="96" x2="108" y2="96"/>
+    <line x1="62" y1="110" x2="120" y2="110"/>
+    <line x1="62" y1="124" x2="100" y2="124"/>
+  </g>
+
+  <!-- Magnifier ring -->
+  <circle cx="135" cy="125" r="28"
+          fill="url(#lensGradient)"
+          stroke="#F84454" stroke-opacity="0.85" stroke-width="3"/>
+  <circle cx="135" cy="125" r="22" fill="white" fill-opacity="0.20"/>
+
+  <!-- Magnifier handle -->
+  <line x1="156" y1="146" x2="174" y2="164"
+        stroke="#F84454" stroke-opacity="0.85"
+        stroke-width="6" stroke-linecap="round"/>
+</svg>

@@ -2,14 +2,24 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Clock } from 'lucide-react';
 import { useTheme } from '../contexts/useTheme';
 import { formatHoursMinutes } from '../utils/timeFormat';
+import {
+  ChartCard,
+  ChartGradients,
+  GRADIENT,
+  GlassTooltip,
+  CHART_PALETTE,
+  getAxisProps,
+  getGridStroke,
+  getCursorFill,
+} from './charts/chartTheme';
 
 interface PlannedVsRealizedChartProps {
   data: { collaborator: string; planned: number; realized: number; legacy: number }[];
 }
 
-function truncateName(name: string, maxLength: number = 18): string {
+function truncateName(name: string, maxLength = 18): string {
   if (name.length <= maxLength) return name;
-  return `${name.substring(0, maxLength)}...`;
+  return `${name.substring(0, maxLength)}…`;
 }
 
 export default function PlannedVsRealizedChart({ data }: PlannedVsRealizedChartProps) {
@@ -24,79 +34,110 @@ export default function PlannedVsRealizedChart({ data }: PlannedVsRealizedChartP
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-minerva-red/10 dark:bg-minerva-red/20 rounded-xl">
-            <Clock className="w-5 h-5 text-minerva-red" />
-          </div>
-          <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Planejado x Realizado</h2>
-        </div>
-        <div className="flex items-center justify-center h-[260px] text-gray-400 dark:text-gray-500">
+      <ChartCard
+        icon={<Clock className="w-4 h-4" />}
+        title="Planejado x Realizado"
+        subtitle="Sem apontamentos"
+      >
+        <div className="flex items-center justify-center h-[240px] text-minerva-navy/40 dark:text-white/40 text-sm">
           Nenhum apontamento RPA encontrado
         </div>
-      </div>
+      </ChartCard>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 card-hover">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-minerva-red/10 dark:bg-minerva-red/20 rounded-xl">
-            <Clock className="w-5 h-5 text-minerva-red" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Planejado x Realizado</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Horas por colaborador RPA</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Plan. {formatHoursMinutes(totalPlanned)} | Real. {formatHoursMinutes(totalRealized)}
+    <ChartCard
+      icon={<Clock className="w-4 h-4" />}
+      title="Planejado x Realizado"
+      subtitle="Horas por colaborador RPA"
+      actions={
+        <div className="text-right text-xs text-minerva-navy/65 dark:text-white/65">
+          <p>
+            <span className="text-minerva-navy/55 dark:text-white/55">Plan.</span>{' '}
+            <span className="font-semibold text-minerva-navy dark:text-white tabular-nums">
+              {formatHoursMinutes(totalPlanned)}
+            </span>
+          </p>
+          <p>
+            <span className="text-minerva-navy/55 dark:text-white/55">Real.</span>{' '}
+            <span className="font-semibold text-emerald-600 dark:text-emerald-300 tabular-nums">
+              {formatHoursMinutes(totalRealized)}
+            </span>
           </p>
         </div>
-      </div>
-
+      }
+    >
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={chartData} margin={{ left: -10, right: 10, bottom: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#475569' : '#e2e8f0'} vertical={false} />
+        <BarChart data={chartData} margin={{ left: -8, right: 12, top: 4, bottom: 18 }}>
+          <ChartGradients />
+          <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} vertical={false} />
           <XAxis
             dataKey="displayName"
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }}
-            axisLine={{ stroke: isDark ? '#475569' : '#e2e8f0' }}
-            tickLine={false}
             angle={-15}
             textAnchor="end"
-            height={60}
+            height={56}
+            {...getAxisProps(isDark)}
           />
-          <YAxis
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }}
-            axisLine={false}
-            tickLine={false}
-          />
+          <YAxis {...getAxisProps(isDark)} />
           <Tooltip
-            contentStyle={{
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              border: `1px solid ${isDark ? '#475569' : '#e2e8f0'}`,
-              borderRadius: '12px',
-              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-              padding: '12px 16px',
-            }}
-            formatter={(value, name) => [
-              <span style={{ color: isDark ? '#f1f5f9' : '#1D2E40', fontWeight: 600 }}>
-                {formatHoursMinutes(Number(value || 0))}
-              </span>,
-              String(name),
-            ]}
-            labelFormatter={(_, payload) => payload?.[0]?.payload?.collaborator ?? ''}
-            cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(29, 46, 64, 0.05)' }}
+            content={
+              <GlassTooltip
+                renderItem={item => (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{
+                        backgroundColor: item.color,
+                        boxShadow: `0 0 8px ${item.color}66`,
+                      }}
+                      aria-hidden
+                    />
+                    <span className="text-minerva-navy/70 dark:text-white/70 mr-auto">
+                      {item.name}
+                    </span>
+                    <span className="font-bold tabular-nums text-minerva-navy dark:text-white">
+                      {formatHoursMinutes(Number(item.value || 0))}
+                    </span>
+                  </div>
+                )}
+                formatLabel={(label: string) => label}
+              />
+            }
+            cursor={{ fill: getCursorFill(isDark) }}
           />
-          <Legend />
-          <Bar dataKey="planned" name="Planejado" fill={isDark ? '#60a5fa' : '#1D2E40'} radius={[6, 6, 0, 0]} />
-          <Bar dataKey="realized" name="Realizado" fill="#10B981" radius={[6, 6, 0, 0]} />
-          <Bar dataKey="legacy" name="Legado" fill="#F59E0B" radius={[6, 6, 0, 0]} />
+          <Legend
+            iconType="circle"
+            wrapperStyle={{ paddingTop: 8, fontSize: 12 }}
+            formatter={value => (
+              <span className="text-minerva-navy/80 dark:text-white/80">{value}</span>
+            )}
+          />
+          <Bar
+            dataKey="planned"
+            name="Planejado"
+            fill={isDark ? GRADIENT.bar('sky') : GRADIENT.bar('navy')}
+            radius={[6, 6, 0, 0]}
+            animationDuration={800}
+            stroke={isDark ? CHART_PALETTE.skyLight : CHART_PALETTE.navy}
+            strokeOpacity={0.2}
+          />
+          <Bar
+            dataKey="realized"
+            name="Realizado"
+            fill={GRADIENT.bar('emerald')}
+            radius={[6, 6, 0, 0]}
+            animationDuration={800}
+          />
+          <Bar
+            dataKey="legacy"
+            name="Legado"
+            fill={GRADIENT.bar('amber')}
+            radius={[6, 6, 0, 0]}
+            animationDuration={800}
+          />
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </ChartCard>
   );
 }

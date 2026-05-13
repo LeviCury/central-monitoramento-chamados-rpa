@@ -1,6 +1,8 @@
 /**
  * Comparador de técnicos lado a lado.
- * O usuário escolhe até 4 técnicos e vê KPIs em colunas paralelas.
+ * O usuário escolhe até 4 técnicos e vê KPIs em colunas paralelas
+ * com mini-bars proporcionais (quem tem o melhor valor aparece com
+ * a barra cheia, os outros proporcionais).
  */
 import { useMemo, useState } from 'react';
 import { Ticket } from '../types';
@@ -15,51 +17,96 @@ interface TechniciansCompareProps {
 
 const MAX = 4;
 
-const HEADER_COLOR_CYCLE = [
-  'from-minerva-navy to-minerva-navy-light',
-  'from-emerald-500 to-emerald-600',
-  'from-amber-400 to-amber-500',
-  'from-violet-500 to-violet-600',
+const COL_BAR = [
+  'bg-violet-500',
+  'bg-emerald-500',
+  'bg-amber-500',
+  'bg-sky-500',
 ];
 
-function MetricRow({
-  label,
-  values,
-  highlight,
-  format,
-}: {
+const AVATAR_GRADIENTS = [
+  'from-rose-400 to-rose-600',
+  'from-amber-400 to-amber-600',
+  'from-emerald-400 to-emerald-600',
+  'from-sky-400 to-sky-600',
+  'from-violet-400 to-violet-600',
+  'from-fuchsia-400 to-fuchsia-600',
+  'from-teal-400 to-teal-600',
+  'from-orange-400 to-orange-600',
+];
+
+function avatarGradient(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
+}
+
+function initials(name: string): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  return parts.map(p => p[0]?.toUpperCase() ?? '').join('') || '?';
+}
+
+interface MetricRowProps {
   label: string;
   values: number[];
   highlight: 'high' | 'low';
   format: (v: number) => string;
-}) {
-  const max = Math.max(...values);
+}
+
+function MetricRow({ label, values, highlight, format }: MetricRowProps) {
+  const max = Math.max(...values, 0);
   const min = Math.min(...values);
+  const sameValues = max === min;
+  // Para a barra, o "ideal" é 100% no melhor; para os outros é
+  // proporcional ao máximo (visual de comparação de magnitude).
+  const denominator = max === 0 ? 1 : max;
 
   return (
-    <tr className="border-t border-minerva-navy/10 dark:border-white/10">
+    <tr className="border-t border-[var(--border-subtle)]">
       <th
         scope="row"
-        className="text-left px-4 py-3 text-xs font-semibold text-minerva-navy/70 dark:text-white/70 uppercase tracking-wide"
+        className="text-left px-4 py-3 text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider-2 align-middle"
       >
         {label}
       </th>
       {values.map((v, i) => {
         const isBest =
-          values.length > 1 && (highlight === 'high' ? v === max : v === min) && max !== min;
+          values.length > 1 && (highlight === 'high' ? v === max : v === min) && !sameValues;
+        const widthPct =
+          highlight === 'high'
+            ? (v / denominator) * 100
+            : v === 0
+              ? 0
+              : (min / Math.max(v, 0.0001)) * 100;
         return (
-          <td
-            key={i}
-            className={`px-4 py-3 text-center text-sm font-bold ${
-              isBest ? 'text-emerald-600 dark:text-emerald-300' : 'text-minerva-navy dark:text-white'
-            }`}
-          >
-            {format(v)}
-            {isBest && (
-              <span className="ml-1 text-[10px] uppercase tracking-wider opacity-70">
-                {highlight === 'high' ? 'top' : 'menor'}
-              </span>
-            )}
+          <td key={i} className="px-3 py-3 align-middle">
+            <div className="flex flex-col items-stretch gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={`text-sm font-semibold tnum ${
+                    isBest
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-[var(--text-primary)]'
+                  }`}
+                >
+                  {format(v)}
+                </span>
+                {isBest && (
+                  <span className="text-[9px] uppercase tracking-wider-2 font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    {highlight === 'high' ? 'top' : 'menor'}
+                  </span>
+                )}
+              </div>
+              <div className="h-1 bg-[var(--bg-subtle)] rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${
+                    isBest ? 'bg-emerald-500' : COL_BAR[i % COL_BAR.length]
+                  } transition-[width] duration-700 ease-out`}
+                  style={{ width: `${Math.max(0, Math.min(100, widthPct))}%` }}
+                />
+              </div>
+            </div>
           </td>
         );
       })}
@@ -90,16 +137,18 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
   };
 
   return (
-    <section className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva overflow-hidden">
-      <header className="px-5 py-4 bg-gradient-to-r from-minerva-navy to-minerva-navy-light flex items-center justify-between">
+    <section className="surface-elevated rounded-3xl overflow-hidden">
+      <header className="px-7 pt-6 pb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/10 rounded-xl">
-            <Users className="w-5 h-5 text-white" aria-hidden />
-          </div>
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
+            <Users className="w-4 h-4" aria-hidden />
+          </span>
           <div>
-            <h2 className="text-lg font-semibold text-white">Comparar Técnicos</h2>
-            <p className="text-white/60 text-xs">
-              Selecione até {MAX} técnicos para ver KPIs lado a lado
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
+              Comparar Técnicos
+            </h2>
+            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+              Selecione até {MAX} técnicos lado a lado
             </p>
           </div>
         </div>
@@ -108,37 +157,43 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
           onClick={() => setCollapsed(c => !c)}
           aria-expanded={!collapsed}
           aria-label={collapsed ? 'Expandir comparador' : 'Recolher comparador'}
-          className="text-white/70 hover:text-white"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
         >
-          {collapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
       </header>
 
       {!collapsed && (
-        <div className="p-5 space-y-4">
+        <div className="px-7 pb-7 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             {selected.map(tech => (
               <span
                 key={tech}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-minerva-navy/10 dark:bg-white/10 text-minerva-navy dark:text-white text-sm"
+                className="inline-flex items-center gap-2 pl-1 pr-2 py-0.5 rounded-full bg-[var(--bg-subtle)] text-[var(--text-primary)] text-sm animate-fade-in-up"
               >
-                {tech}
+                <span
+                  className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-semibold text-white bg-gradient-to-br ${avatarGradient(tech)}`}
+                  aria-hidden
+                >
+                  {initials(tech)}
+                </span>
+                <span className="font-medium truncate max-w-[180px]">{tech}</span>
                 <button
                   type="button"
                   onClick={() => handleRemove(tech)}
                   aria-label={`Remover ${tech}`}
-                  className="hover:text-minerva-red"
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[var(--text-tertiary)] hover:bg-rose-500/15 hover:text-rose-600 transition-colors"
                 >
-                  <X className="w-3.5 h-3.5" aria-hidden />
+                  <X className="w-3 h-3" aria-hidden />
                 </button>
               </span>
             ))}
             {selected.length < MAX && available.length > 0 && (
-              <label className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-minerva-navy/5 dark:bg-white/5 text-minerva-navy dark:text-white text-sm cursor-pointer hover:bg-minerva-navy/10 dark:hover:bg-white/10">
+              <label className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--bg-subtle)] border border-dashed border-[var(--border-default)] text-[var(--text-secondary)] text-sm cursor-pointer hover:text-[var(--text-primary)] hover:border-[var(--border-strong)] transition-colors">
                 <Plus className="w-3.5 h-3.5" aria-hidden />
-                <span className="sr-only">Adicionar técnico</span>
+                <span>Adicionar técnico</span>
                 <select
-                  className="bg-transparent text-sm focus:outline-none cursor-pointer"
+                  className="absolute inset-0 opacity-0 cursor-pointer"
                   value=""
                   onChange={e => {
                     if (e.target.value) handleAdd(e.target.value);
@@ -147,7 +202,7 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
                 >
                   <option value="">Adicionar técnico…</option>
                   {available.map(t => (
-                    <option key={t} value={t} className="text-minerva-navy">
+                    <option key={t} value={t}>
                       {t}
                     </option>
                   ))}
@@ -157,23 +212,39 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
           </div>
 
           {metrics.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">
-              Adicione técnicos para começar a comparar.
-            </p>
+            <div className="text-center py-12 rounded-2xl border border-dashed border-[var(--border-default)]">
+              <Users
+                className="w-8 h-8 mx-auto text-[var(--text-tertiary)] opacity-50 mb-2"
+                aria-hidden
+              />
+              <p className="text-sm text-[var(--text-tertiary)]">
+                Adicione técnicos para começar a comparar.
+              </p>
+            </div>
           ) : (
-            <div className="overflow-x-auto -mx-5 px-5">
+            <div className="overflow-x-auto -mx-7 px-7 pb-1">
               <table className="w-full">
                 <thead>
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-minerva-navy/60 dark:text-white/60">
+                    <th className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wider-2 text-[var(--text-tertiary)]">
                       Métrica
                     </th>
-                    {metrics.map((m, i) => (
+                    {metrics.map(m => (
                       <th
                         key={m.technician}
-                        className={`px-4 py-3 text-center text-sm font-semibold text-white bg-gradient-to-br ${HEADER_COLOR_CYCLE[i % HEADER_COLOR_CYCLE.length]} ${i === 0 ? 'rounded-tl-xl' : ''} ${i === metrics.length - 1 ? 'rounded-tr-xl' : ''}`}
+                        className="px-3 py-3 text-center"
                       >
-                        {m.technician}
+                        <div className="flex items-center gap-2 justify-center">
+                          <span
+                            className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-semibold text-white bg-gradient-to-br ${avatarGradient(m.technician)}`}
+                            aria-hidden
+                          >
+                            {initials(m.technician)}
+                          </span>
+                          <span className="text-sm font-semibold text-[var(--text-primary)] truncate max-w-[140px]">
+                            {m.technician}
+                          </span>
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -233,9 +304,9 @@ export function TechniciansCompare({ tickets, technicians }: TechniciansCompareP
           )}
 
           {metrics.length > 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Destaque verde: melhor valor (maior em produtividade, menor em itens negativos como
-              chamados antigos ou tempo médio).
+            <p className="text-[11px] text-[var(--text-tertiary)] leading-snug">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 align-middle" />
+              Destaque em verde: melhor valor (maior em produtividade, menor em itens negativos).
             </p>
           )}
         </div>

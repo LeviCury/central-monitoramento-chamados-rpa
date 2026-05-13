@@ -2,157 +2,428 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Minerva Foods Brand Colors - Light Mode */
+/* ============================================================
+ * Design system — Apple/Linear inspired
+ * Princípios:
+ *  - Fundo NEUTRO (off-white / near-black). Cor é acento pontual.
+ *  - Tipografia escultural com tracking calibrado.
+ *  - Sombras quase imperceptíveis. Profundidade vem do contraste de tom.
+ *  - Glass realmente sutil, não chamativo.
+ *  - Acentos de marca apenas em ações de marca (vermelho Minerva).
+ * ============================================================ */
+
 :root {
+  /* Marca */
   --minerva-navy: #1D2E40;
   --minerva-red: #F84454;
-  --minerva-white: #FFFFFF;
-  --minerva-navy-light: #2a4158;
-  --minerva-navy-dark: #152231;
-  --minerva-red-light: #ff6b78;
-  --minerva-red-dark: #d63644;
-  --minerva-gray-50: #f8fafc;
-  --minerva-gray-100: #f1f5f9;
-  --minerva-gray-200: #e2e8f0;
-  --minerva-gray-300: #cbd5e1;
-  --minerva-gray-400: #94a3b8;
-  --minerva-gray-500: #64748b;
-  --minerva-gray-600: #475569;
-  
-  /* Semantic colors - Light */
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #1D2E40;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border-color: #e2e8f0;
+
+  /* Light: off-white quente, não branco puro */
+  --bg-base: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-subtle: #f4f4f5;
+
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-tertiary: #a0a0a8;
+
+  --border-subtle: rgb(0 0 0 / 0.06);
+  --border-default: rgb(0 0 0 / 0.08);
+  --border-strong: rgb(0 0 0 / 0.12);
+
+  /* Glass — quase invisível */
+  --glass-bg: rgb(255 255 255 / 0.65);
+  --glass-bg-strong: rgb(255 255 255 / 0.85);
+
+  --ring-color: rgb(248 68 84 / 0.40);
+
+  /* Tipografia */
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+
+  color-scheme: light;
 }
 
-/* Dark Mode Colors */
 .dark {
-  --minerva-gray-50: #1e293b;
-  --minerva-gray-100: #334155;
-  --minerva-gray-200: #475569;
-  --minerva-gray-300: #64748b;
-  --minerva-gray-400: #94a3b8;
-  --minerva-gray-500: #cbd5e1;
-  --minerva-gray-600: #e2e8f0;
-  
-  /* Semantic colors - Dark */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-color: #334155;
+  /* Dark: near-black profundo (ink-950 #09090b), não roxo nem azul */
+  --bg-base: #09090b;
+  --bg-elevated: #131316;
+  --bg-subtle: #1a1a1d;
+
+  --text-primary: #fafafa;
+  --text-secondary: #a0a0a8;
+  --text-tertiary: #71717a;
+
+  --border-subtle: rgb(255 255 255 / 0.05);
+  --border-default: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.12);
+
+  --glass-bg: rgb(24 24 27 / 0.55);
+  --glass-bg-strong: rgb(24 24 27 / 0.85);
+
+  --ring-color: rgb(255 107 120 / 0.50);
+
+  color-scheme: dark;
 }
 
-/* Custom scrollbar - Light */
+/* ============================================================
+ * Body — fundo COMPLETAMENTE neutro com 1 acento sutilíssimo
+ * (radial vermelho minerva no canto superior direito, opacidade 4%)
+ * ============================================================ */
+
+html, body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  min-height: 100%;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  position: relative;
+  background-image:
+    radial-gradient(ellipse 800px 600px at 100% -100px, rgb(248 68 84 / 0.03), transparent 70%),
+    radial-gradient(ellipse 600px 400px at -100px 100%, rgb(29 46 64 / 0.025), transparent 70%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(ellipse 800px 600px at 100% -100px, rgb(248 68 84 / 0.06), transparent 70%),
+    radial-gradient(ellipse 700px 500px at -100px 100%, rgb(99 102 241 / 0.04), transparent 70%);
+}
+
+#root {
+  position: relative;
+  min-height: 100vh;
+}
+
+/* ============================================================
+ * Glass cards — Apple Vision Pro style
+ * Translucidez sutil + ring fino + sombra quase invisível
+ * ============================================================ */
+
+@layer components {
+  .surface {
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.25rem;
+  }
+
+  .surface-elevated {
+    background-color: var(--bg-elevated);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.03);
+    border: 1px solid var(--border-subtle);
+    border-radius: 1.25rem;
+  }
+
+  .dark .surface-elevated {
+    background-color: var(--bg-elevated);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 1px 3px rgb(0 0 0 / 0.30);
+  }
+
+  /* Glass — usado apenas onde precisa transparência (header sticky, drawer) */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .glass-strong {
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--border-default);
+  }
+
+  /* Hover lift sutil para cards interativos */
+  .hover-lift {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -12px rgb(15 23 42 / 0.12),
+                0 4px 12px -4px rgb(15 23 42 / 0.08);
+  }
+
+  .dark .hover-lift:hover {
+    box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.50),
+                0 4px 12px -4px rgb(0 0 0 / 0.30);
+  }
+
+  /* Shimmer skeleton */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--border-subtle) 0%,
+      var(--border-default) 50%,
+      var(--border-subtle) 100%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2.4s linear infinite;
+    border-radius: 0.5rem;
+  }
+
+  /* Ghost button — Apple secondary style */
+  .ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.625rem;
+    font-weight: 500;
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    background: transparent;
+    border: 1px solid var(--border-default);
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease,
+      transform 0.15s ease;
+    letter-spacing: -0.005em;
+  }
+
+  .ghost-btn:hover {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+  }
+
+  .ghost-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* Primary button — Apple style com gradient sutil */
+  .primary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: 0.625rem;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: white;
+    background: linear-gradient(180deg, #ff5a68 0%, var(--minerva-red) 100%);
+    border: 1px solid rgb(0 0 0 / 0.10);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.20),
+                0 1px 2px rgb(248 68 84 / 0.20);
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease,
+      filter 0.15s ease;
+    letter-spacing: -0.005em;
+  }
+
+  .primary-btn:hover {
+    filter: brightness(1.06);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.20),
+                0 4px 12px rgb(248 68 84 / 0.30);
+  }
+
+  .primary-btn:active {
+    transform: scale(0.98);
+  }
+
+  .primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Live dot — pulso verde minimalista */
+  .live-dot {
+    position: relative;
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+  }
+
+  .live-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: #10b981;
+    opacity: 0.30;
+    animation: pulse-soft 2s ease-in-out infinite;
+  }
+
+  /* Dividers — nunca fortes */
+  .divider {
+    height: 1px;
+    background-color: var(--border-subtle);
+  }
+
+  /* Apple-style tabular numbers */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ============================================================
+ * Scrollbars discretas
+ * ============================================================ */
+
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-tertiary);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--minerva-navy);
-  border-radius: 4px;
+  background: rgb(0 0 0 / 0.12);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--minerva-navy-light);
-}
-
-/* Dark mode scrollbar */
-.dark ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: rgb(0 0 0 / 0.20);
+  background-clip: padding-box;
+  border: 3px solid transparent;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: rgb(255 255 255 / 0.12);
+  background-clip: padding-box;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: rgb(255 255 255 / 0.20);
+  background-clip: padding-box;
 }
 
-/* Smooth transitions */
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
+/* ============================================================
+ * Foco visível — Apple style (ring 2px com offset)
+ * ============================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--ring-color);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
 }
 
-/* Custom animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+button:focus-visible,
+a:focus-visible {
+  outline-offset: 3px;
 }
 
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+/* ============================================================
+ * Selection
+ * ============================================================ */
+
+::selection {
+  background-color: rgb(248 68 84 / 0.20);
+  color: var(--text-primary);
 }
 
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+/* ============================================================
+ * Reduced motion — respeita preferência
+ * ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
+/* ============================================================
+ * Compatibilidade legada — mantém classes que outros componentes
+ * ainda referenciam, mas redirecionando para os novos tokens.
+ * ============================================================ */
 
-.animate-slide-in {
-  animation: slideIn 0.5s ease-out forwards;
-}
-
-.animate-pulse-slow {
-  animation: pulse-slow 2s ease-in-out infinite;
-}
-
-/* Gradient backgrounds */
 .bg-minerva-gradient {
-  background: linear-gradient(135deg, var(--minerva-navy) 0%, var(--minerva-navy-light) 100%);
+  /* Modo apresentação — fundo escuro near-black sutil */
+  background:
+    radial-gradient(ellipse 1000px 600px at 50% -100px, rgb(248 68 84 / 0.10), transparent 70%),
+    #09090b;
 }
 
 .bg-minerva-gradient-light {
-  background: linear-gradient(135deg, var(--minerva-gray-50) 0%, var(--minerva-gray-100) 100%);
+  background-color: var(--bg-base);
 }
 
-/* Card hover effects */
+.glass-card {
+  /* Alias para .surface-elevated, mantido por compatibilidade */
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1.25rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.02);
+}
+
+.dark .glass-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04),
+              0 1px 3px rgb(0 0 0 / 0.30);
+}
+
+.glass-card-strong {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 1.25rem;
+  box-shadow: 0 12px 32px -8px rgb(15 23 42 / 0.10),
+              0 4px 12px -4px rgb(15 23 42 / 0.06);
+}
+
+.dark .glass-card-strong {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06),
+              0 12px 32px -8px rgb(0 0 0 / 0.40),
+              0 4px 12px -4px rgb(0 0 0 / 0.30);
+}
+
 .card-hover {
-  transition: all 0.3s ease;
+  transition:
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.18s ease;
 }
 
 .card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
+  border-color: var(--border-default);
+  box-shadow: 0 12px 32px -12px rgb(15 23 42 / 0.12),
+              0 4px 12px -4px rgb(15 23 42 / 0.06);
 }
 
-/* Glass effect */
-.glass {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+.dark .card-hover:hover {
+  box-shadow: 0 12px 32px -12px rgb(0 0 0 / 0.50),
+              0 4px 12px -4px rgb(0 0 0 / 0.30);
 }
 
-.dark .glass {
-  background: rgba(30, 41, 59, 0.95);
+/* gradient-text mantido — usado no texto "0" do donut, etc. */
+.gradient-text {
+  background: linear-gradient(180deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
-/* Dark mode gradient backgrounds */
-.dark .bg-minerva-gradient-light {
-  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+/* Aliases pra animações usadas por componentes existentes */
+.animate-fade-in {
+  animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Presentation Mode Styles */
+.animate-slide-in {
+  animation: fade-in-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+/* Apresentação — wrapper de modo TV */
 .presentation-mode {
   overflow: hidden;
 }
@@ -161,29 +432,35 @@
   transform: none;
 }
 
-/* Fullscreen specific styles */
+/* `ambient-orbs` agora é praticamente invisível — apenas um glow
+ * muito sutil pra dar vida ao fundo sem poluir. */
+.ambient-orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.ambient-orbs::before {
+  content: '';
+  position: absolute;
+  width: 600px;
+  height: 600px;
+  top: -300px;
+  right: -200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(248 68 84 / 0.06), transparent 70%);
+  filter: blur(40px);
+}
+
+.dark .ambient-orbs::before {
+  background: radial-gradient(circle, rgb(248 68 84 / 0.10), transparent 70%);
+}
+
+/* live-dot já está em @layer components acima — sem reset aqui */
+
+/* Splash full bleed */
 :fullscreen {
-  background: var(--bg-primary);
-}
-
-:fullscreen .presentation-mode {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Animation for presentation mode transition */
-@keyframes scaleIn {
-  from { 
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to { 
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.presentation-mode main {
-  animation: scaleIn 0.3s ease-out forwards;
+  background: var(--bg-base);
 }

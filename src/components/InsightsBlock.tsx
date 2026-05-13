@@ -1,7 +1,6 @@
 /**
- * Bloco "🎯 Hoje" no topo do dashboard.
- * - Insights: leitura textual e curta dos KPIs (gerados por regras simples).
- * - Action Items: o que o time precisa **fazer**, com 1 clique para aplicar o filtro correspondente.
+ * Bloco "Hoje no RPA" — apresentação Apple-style.
+ * Insights e ações com contraste mínimo, ênfase via tipografia.
  */
 import { ActionItem, Insight } from '../services/analytics';
 import { ArrowRight, ChevronDown, ChevronUp, Sparkles, Target } from 'lucide-react';
@@ -13,17 +12,17 @@ interface InsightsBlockProps {
   onApplyAction: (item: ActionItem) => void;
 }
 
-const INSIGHT_TONE: Record<Insight['tone'], string> = {
-  good: 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-200',
-  warn: 'border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200',
-  bad: 'border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 text-red-800 dark:text-red-200',
-  neutral: 'border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/30 text-slate-700 dark:text-slate-200',
+const TONE_DOT: Record<Insight['tone'], string> = {
+  good: 'bg-emerald-500',
+  warn: 'bg-amber-500',
+  bad: 'bg-rose-500',
+  neutral: 'bg-[var(--text-tertiary)]',
 };
 
-const SEVERITY_BADGE: Record<ActionItem['severity'], string> = {
-  high: 'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30',
-  medium: 'bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30',
-  low: 'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-500/30',
+const SEVERITY_TONE: Record<ActionItem['severity'], string> = {
+  high: 'text-rose-700 dark:text-rose-400 bg-rose-500/10',
+  medium: 'text-amber-700 dark:text-amber-400 bg-amber-500/10',
+  low: 'text-sky-700 dark:text-sky-400 bg-sky-500/10',
 };
 
 const SEVERITY_LABEL: Record<ActionItem['severity'], string> = {
@@ -40,41 +39,55 @@ export function InsightsBlock({ insights, actionItems, onApplyAction }: Insights
   return (
     <section
       data-export="insights"
-      className="mb-6 rounded-2xl border border-minerva-navy/10 dark:border-white/10 bg-white dark:bg-slate-800 shadow-minerva overflow-hidden animate-fade-in"
+      className="surface-elevated rounded-3xl overflow-hidden animate-fade-in-up"
       aria-label="Resumo do dia: insights e próximas ações"
     >
-      <header className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-minerva-navy/5 to-minerva-navy/0 dark:from-white/5">
-        <div className="flex items-center gap-2 text-minerva-navy dark:text-white">
-          <Target className="w-5 h-5" aria-hidden />
-          <h2 className="text-sm font-semibold uppercase tracking-wide">Hoje no RPA</h2>
+      <header className="flex items-center justify-between px-7 pt-6 pb-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)] shrink-0">
+            <Target className="w-4 h-4" aria-hidden />
+          </span>
+          <div>
+            <h2 className="text-[15px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
+              Hoje no RPA
+            </h2>
+            <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+              Resumo executivo do período
+            </p>
+          </div>
         </div>
         <button
           type="button"
           onClick={() => setCollapsed(c => !c)}
           aria-expanded={!collapsed}
           aria-label={collapsed ? 'Expandir resumo' : 'Recolher resumo'}
-          className="text-minerva-navy/60 dark:text-white/60 hover:text-minerva-navy dark:hover:text-white transition-colors"
+          className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
         >
-          {collapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+          {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
       </header>
 
       {!collapsed && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-px bg-minerva-navy/10 dark:bg-white/10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-[var(--border-subtle)]">
           {insights.length > 0 && (
-            <div className="p-5 bg-white dark:bg-slate-800">
-              <div className="flex items-center gap-2 mb-3 text-minerva-navy dark:text-white">
-                <Sparkles className="w-4 h-4" aria-hidden />
-                <h3 className="text-xs font-semibold uppercase tracking-wide">Leitura rápida</h3>
+            <div className="px-7 py-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" aria-hidden />
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider-2 text-[var(--text-tertiary)]">
+                  Leitura rápida
+                </h3>
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {insights.map(i => (
                   <li
                     key={i.id}
-                    className={`text-sm rounded-xl border px-3 py-2 flex gap-2 items-start ${INSIGHT_TONE[i.tone]}`}
+                    className="text-sm text-[var(--text-primary)] flex gap-3 items-start leading-snug"
                   >
-                    <span aria-hidden className="text-base leading-none">{i.emoji}</span>
-                    <span className="leading-snug">{i.text}</span>
+                    <span
+                      className={`mt-1.5 inline-block w-1.5 h-1.5 rounded-full shrink-0 ${TONE_DOT[i.tone]}`}
+                      aria-hidden
+                    />
+                    <span>{i.text}</span>
                   </li>
                 ))}
               </ul>
@@ -82,44 +95,41 @@ export function InsightsBlock({ insights, actionItems, onApplyAction }: Insights
           )}
 
           {actionItems.length > 0 && (
-            <div className="p-5 bg-white dark:bg-slate-800">
-              <div className="flex items-center gap-2 mb-3 text-minerva-navy dark:text-white">
-                <ArrowRight className="w-4 h-4" aria-hidden />
-                <h3 className="text-xs font-semibold uppercase tracking-wide">Próximas ações</h3>
+            <div className="px-7 py-5">
+              <div className="flex items-center gap-2 mb-4">
+                <ArrowRight className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" aria-hidden />
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider-2 text-[var(--text-tertiary)]">
+                  Próximas ações
+                </h3>
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-1.5">
                 {actionItems.map(a => (
-                  <li
-                    key={a.id}
-                    className="rounded-xl border border-slate-200 dark:border-slate-700 hover:border-minerva-red/40 dark:hover:border-minerva-red/40 transition-colors"
-                  >
+                  <li key={a.id}>
                     <button
                       type="button"
                       onClick={() => onApplyAction(a)}
                       disabled={!a.filter}
-                      className="w-full text-left px-3 py-2 flex items-start gap-3 disabled:cursor-default group"
+                      className="group w-full text-left px-3 py-2.5 -mx-3 rounded-xl flex items-start gap-3 hover:bg-[var(--bg-subtle)] transition-colors disabled:cursor-default disabled:hover:bg-transparent"
                     >
                       <span
-                        className={`shrink-0 inline-flex items-center justify-center min-w-[2.25rem] h-9 px-2 rounded-lg border text-sm font-bold ${SEVERITY_BADGE[a.severity]}`}
+                        className={`shrink-0 inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-md text-xs font-semibold tnum ${SEVERITY_TONE[a.severity]}`}
                         aria-label={`Severidade ${SEVERITY_LABEL[a.severity]}`}
                       >
                         {a.count}
                       </span>
                       <span className="flex-1 min-w-0">
-                        <span className="block text-sm font-semibold text-minerva-navy dark:text-white truncate">
+                        <span className="block text-sm font-medium text-[var(--text-primary)] truncate">
                           {a.title}
                         </span>
-                        <span className="block text-xs text-slate-500 dark:text-slate-400 leading-snug">
+                        <span className="block text-xs text-[var(--text-secondary)] leading-snug mt-0.5">
                           {a.description}
                         </span>
                       </span>
                       {a.filter && (
-                        <span
-                          className="shrink-0 self-center text-xs font-medium text-minerva-navy/70 dark:text-white/70 group-hover:text-minerva-red transition-colors"
+                        <ArrowRight
+                          className="w-3.5 h-3.5 mt-1 shrink-0 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)] transition-all group-hover:translate-x-0.5"
                           aria-hidden
-                        >
-                          Filtrar →
-                        </span>
+                        />
                       )}
                     </button>
                   </li>

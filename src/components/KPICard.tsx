@@ -1,102 +1,106 @@
-import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 import { ReactNode } from 'react';
+import { useCountUp } from '../hooks/useCountUp';
 
 export type KPIColor = 'navy' | 'green' | 'amber' | 'red' | 'violet';
 
 export interface KPICardProps {
   title: string;
   value: number | string;
-  /** Subtítulo simples (1 linha curta). */
   subtitle?: string;
-  /** Subtítulo customizado (ReactNode) — substitui `subtitle` quando presente. */
   subtitleNode?: ReactNode;
-  /** Mini-pílulas no rodapé (ex.: Incidente 5 · Requisição 4). */
   breakdown?: ReactNode;
   icon: ReactNode;
   color?: KPIColor;
   delay?: number;
   large?: boolean;
-  /**
-   * Variação percentual vs período anterior. Quando `null`/`undefined`
-   * o card simplesmente não exibe o trecho de comparação.
-   *
-   * IMPORTANTE: só passe `delta` quando a comparação fizer sentido para
-   * o KPI. Para snapshots instantâneos (em aberto, parados, médias) a
-   * comparação com o período anterior gera ruído (variações de centenas
-   * de %) sem informação real — não passe `delta` nesses casos.
-   */
   delta?: number | null;
-  /** Direção desejada (true: subir é bom, false: descer é bom). */
   positiveIsGood?: boolean;
-  /** Skeleton/loading. */
   loading?: boolean;
 }
 
-const COLOR_STYLES: Record<KPIColor, { bg: string; subtext: string; deltaSurface: string }> = {
+interface ColorTokens {
+  iconBg: string;
+  iconText: string;
+}
+
+/**
+ * Cor é APENAS no quadradinho do ícone — não no fundo do card.
+ * O card permanece neutro (Apple-style); a cor identifica a categoria
+ * num único ponto, sem poluir.
+ */
+const COLOR_TOKENS: Record<KPIColor, ColorTokens> = {
   navy: {
-    bg: 'bg-gradient-to-br from-minerva-navy to-minerva-navy-light',
-    subtext: 'text-white/70',
-    deltaSurface: 'bg-white/10',
+    iconBg: 'bg-[var(--bg-subtle)]',
+    iconText: 'text-[var(--text-primary)]',
   },
   green: {
-    bg: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
-    subtext: 'text-white/80',
-    deltaSurface: 'bg-white/15',
+    iconBg: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+    iconText: 'text-emerald-600 dark:text-emerald-400',
   },
   amber: {
-    bg: 'bg-gradient-to-br from-amber-400 to-amber-500',
-    subtext: 'text-white/85',
-    deltaSurface: 'bg-white/20',
+    iconBg: 'bg-amber-500/10 dark:bg-amber-500/15',
+    iconText: 'text-amber-600 dark:text-amber-400',
   },
   red: {
-    bg: 'bg-gradient-to-br from-minerva-red to-minerva-red-dark',
-    subtext: 'text-white/85',
-    deltaSurface: 'bg-white/15',
+    iconBg: 'bg-rose-500/10 dark:bg-rose-500/15',
+    iconText: 'text-rose-600 dark:text-rose-400',
   },
   violet: {
-    bg: 'bg-gradient-to-br from-violet-500 to-violet-600',
-    subtext: 'text-white/80',
-    deltaSurface: 'bg-white/15',
+    iconBg: 'bg-violet-500/10 dark:bg-violet-500/15',
+    iconText: 'text-violet-600 dark:text-violet-400',
   },
 };
 
-interface DeltaRowProps {
+interface DeltaPillProps {
   delta: number;
   positiveIsGood?: boolean;
-  surfaceClass: string;
-  large?: boolean;
 }
 
-function DeltaRow({ delta, positiveIsGood = true, surfaceClass, large = false }: DeltaRowProps) {
+function DeltaPill({ delta, positiveIsGood = true }: DeltaPillProps) {
   const isFlat = delta === 0;
   const isUp = delta > 0;
   const isGood = isFlat ? null : positiveIsGood ? isUp : !isUp;
 
-  const Icon = isFlat ? Minus : isUp ? ArrowUpRight : ArrowDownRight;
-  const valueColor = isFlat
-    ? 'text-white/90'
+  const Icon = isFlat ? Minus : isUp ? ArrowUp : ArrowDown;
+  const toneClass = isFlat
+    ? 'text-[var(--text-tertiary)] bg-[var(--bg-subtle)]'
     : isGood
-      ? 'text-emerald-100'
-      : 'text-rose-100';
+      ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-500/10'
+      : 'text-rose-700 dark:text-rose-400 bg-rose-500/10';
 
   const sign = isUp ? '+' : '';
   const formatted = `${sign}${delta}%`;
 
   return (
-    <div
-      className={`mt-3 flex items-center gap-2 rounded-lg ${surfaceClass} px-2.5 py-1.5`}
-      role="group"
-      aria-label="Variação vs período anterior"
+    <span
+      className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-semibold tnum ${toneClass}`}
+      title={`${formatted} vs período anterior`}
     >
-      <Icon className={`${large ? 'w-4 h-4' : 'w-3.5 h-3.5'} ${valueColor}`} aria-hidden />
-      <span className={`${large ? 'text-base' : 'text-sm'} font-semibold ${valueColor} tabular-nums`}>
-        {formatted}
-      </span>
-      <span className={`text-[10px] uppercase tracking-wide ${large ? 'text-xs' : ''} text-white/70 leading-tight`}>
-        vs período anterior
-      </span>
-    </div>
+      <Icon className="w-2.5 h-2.5" aria-hidden strokeWidth={3} />
+      {formatted}
+    </span>
   );
+}
+
+function useAnimatedValue(value: number | string): string | number {
+  const numericValue = typeof value === 'number' ? value : NaN;
+  const { formatted } = useCountUp(Number.isFinite(numericValue) ? numericValue : 0, {
+    durationMs: 1100,
+  });
+
+  if (typeof value === 'number' && Number.isFinite(value)) return formatted;
+
+  if (typeof value === 'string') {
+    const match = value.match(/^(\d[\d.,]*)\s*(.*)$/);
+    if (match) {
+      const num = Number(match[1].replace(/\./g, '').replace(',', '.'));
+      if (Number.isFinite(num)) {
+        return `${formatted}${match[2] ? ' ' + match[2] : ''}`;
+      }
+    }
+  }
+  return value;
 }
 
 export function KPICard({
@@ -113,54 +117,66 @@ export function KPICard({
   positiveIsGood = true,
   loading = false,
 }: KPICardProps) {
-  const styles = COLOR_STYLES[color];
-
-  const titleClass = large
-    ? 'text-sm font-semibold uppercase tracking-wide'
-    : 'text-[11px] font-semibold uppercase tracking-wider';
-  const valueClass = large ? 'text-5xl' : 'text-4xl';
-  const subtitleClass = large ? 'text-base' : 'text-xs';
+  const tokens = COLOR_TOKENS[color];
+  const display = useAnimatedValue(value);
 
   return (
     <div
-      className={`${styles.bg} rounded-2xl ${large ? 'p-7' : 'p-5'} shadow-minerva-lg card-hover animate-fade-in transition-all text-white flex flex-col`}
-      style={{ animationDelay: `${delay * 0.1}s` }}
+      className={[
+        'surface-elevated hover-lift relative flex flex-col',
+        large ? 'p-8 rounded-3xl' : 'p-6 rounded-2xl',
+        'animate-fade-in-up',
+      ].join(' ')}
+      style={{ animationDelay: `${delay * 60}ms` }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <p className={`${titleClass} ${styles.subtext} leading-snug`}>{title}</p>
-        <div className={`${large ? 'p-3' : 'p-2.5'} bg-white/20 rounded-xl shrink-0`}>{icon}</div>
+      {/* Header: label + ícone */}
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <p
+          className={`text-[11px] font-medium uppercase tracking-wider-2 text-[var(--text-tertiary)] leading-tight pt-1`}
+        >
+          {title}
+        </p>
+        <div
+          className={`inline-flex items-center justify-center ${large ? 'w-10 h-10 rounded-xl' : 'w-8 h-8 rounded-lg'} ${tokens.iconBg} ${tokens.iconText} shrink-0`}
+        >
+          {icon}
+        </div>
       </div>
 
+      {/* Número escultural */}
       {loading ? (
-        <div className={`${large ? 'h-12 w-32 mt-4' : 'h-10 w-24 mt-3'} rounded-xl bg-white/20 animate-pulse`} />
-      ) : (
-        <p className={`${valueClass} font-bold tracking-tight mt-2 leading-none`}>
-          {typeof value === 'number' ? value.toLocaleString('pt-BR') : value}
-        </p>
-      )}
-
-      {subtitleNode ? (
-        <div className="mt-3">{subtitleNode}</div>
-      ) : (
-        subtitle && (
-          <p className={`${subtitleClass} ${styles.subtext} mt-2`}>
-            {subtitle}
-          </p>
-        )
-      )}
-
-      {delta !== null && delta !== undefined && Number.isFinite(delta) && (
-        <DeltaRow
-          delta={delta}
-          positiveIsGood={positiveIsGood}
-          surfaceClass={styles.deltaSurface}
-          large={large}
+        <div
+          className={`${large ? 'h-14 w-40' : 'h-12 w-32'} shimmer rounded-md`}
+          aria-hidden
         />
+      ) : (
+        <div className="flex items-baseline gap-2">
+          <p
+            className={[
+              large ? 'text-[64px]' : 'text-[44px]',
+              'font-semibold tracking-tightest leading-none tnum text-[var(--text-primary)]',
+            ].join(' ')}
+            style={{ fontVariationSettings: '"opsz" 32' }}
+          >
+            {display}
+          </p>
+          {delta !== null && delta !== undefined && Number.isFinite(delta) && (
+            <DeltaPill delta={delta} positiveIsGood={positiveIsGood} />
+          )}
+        </div>
       )}
 
+      {/* Subtitle / descrição */}
+      {(subtitleNode || subtitle) && (
+        <div className={`mt-3 ${large ? 'text-sm' : 'text-[13px]'} text-[var(--text-secondary)] leading-snug`}>
+          {subtitleNode ? subtitleNode : subtitle}
+        </div>
+      )}
+
+      {/* Breakdown (chips no rodapé) */}
       {breakdown && (
-        <div className="mt-auto pt-4 border-t border-white/15 flex flex-wrap gap-1.5">
-          {breakdown}
+        <div className="mt-auto pt-5">
+          <div className="flex flex-wrap gap-1.5">{breakdown}</div>
         </div>
       )}
     </div>

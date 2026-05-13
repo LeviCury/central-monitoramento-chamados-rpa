@@ -1,6 +1,15 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users } from 'lucide-react';
 import { useTheme } from '../contexts/useTheme';
+import {
+  ChartCard,
+  ChartGradients,
+  GlassTooltip,
+  fillForRank,
+  getAxisProps,
+  getGridStroke,
+  getCursorFill,
+} from './charts/chartTheme';
 
 interface TechnicianChartProps {
   data: { technician: string; count: number }[];
@@ -8,56 +17,22 @@ interface TechnicianChartProps {
   selectedTechnicians?: string[];
 }
 
-function truncateName(name: string, maxLength: number = 18): string {
+function truncateName(name: string, maxLength = 18): string {
   if (!name || name === 'null' || name === 'undefined') return 'Não atribuído';
   if (name.length <= maxLength) return name;
-  return name.substring(0, maxLength) + '...';
+  return name.substring(0, maxLength) + '…';
 }
 
 function formatTechnicianName(name: string): string {
   if (!name || name === 'null' || name === 'undefined') return 'Não atribuído';
-  
   const cleanName = name.trim();
-  
-  if (/^\d+$/.test(cleanName)) {
-    return `Técnico #${cleanName}`;
-  }
-  
+  if (/^\d+$/.test(cleanName)) return `Técnico #${cleanName}`;
   if (cleanName.includes(',')) {
     const parts = cleanName.split(',').map(p => p.trim());
     return truncateName(`${parts[1]} ${parts[0]}`);
   }
-  
   return truncateName(cleanName);
 }
-
-// Gradiente de cores Minerva - Light Mode
-const COLORS_LIGHT = [
-  '#1D2E40', // Navy
-  '#F84454', // Red
-  '#2a4158', // Navy light
-  '#ff6b78', // Red light
-  '#3d5a7a', // Navy lighter
-  '#10b981', // Green
-  '#f59e0b', // Amber
-  '#8b5cf6', // Purple
-  '#06b6d4', // Cyan
-  '#ec4899', // Pink
-];
-
-// Gradiente de cores para Dark Mode (mais vibrantes)
-const COLORS_DARK = [
-  '#60a5fa', // Blue
-  '#F84454', // Red
-  '#34d399', // Green
-  '#fbbf24', // Amber
-  '#a78bfa', // Purple
-  '#22d3ee', // Cyan
-  '#f472b6', // Pink
-  '#fb923c', // Orange
-  '#4ade80', // Light Green
-  '#c084fc', // Light Purple
-];
 
 export default function TechnicianChart({
   data,
@@ -70,99 +45,110 @@ export default function TechnicianChart({
   const displayData = data
     .filter(d => d.technician && d.technician !== 'null' && d.technician !== '')
     .slice(0, 10)
-    .map(d => ({
+    .map((d, i) => ({
       ...d,
       displayName: formatTechnicianName(d.technician),
       fullName: d.technician,
+      color: fillForRank(i),
     }));
 
   const total = displayData.reduce((sum, item) => sum + item.count, 0);
 
   if (displayData.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 h-full">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-minerva-red/10 dark:bg-minerva-red/20 rounded-xl">
-            <Users className="w-5 h-5 text-minerva-red" />
-          </div>
-          <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Chamados por Técnico</h2>
-        </div>
-        <div className="flex items-center justify-center h-[280px] text-gray-400 dark:text-gray-500">
+      <ChartCard
+        icon={<Users className="w-4 h-4" />}
+        title="Chamados por Técnico"
+        subtitle="Sem dados"
+      >
+        <div className="flex items-center justify-center h-[260px] text-minerva-navy/40 dark:text-white/40 text-sm">
           Nenhum técnico encontrado
         </div>
-      </div>
+      </ChartCard>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 card-hover">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-minerva-red/10 dark:bg-minerva-red/20 rounded-xl">
-            <Users className="w-5 h-5 text-minerva-red" />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">Chamados por Técnico</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Top {displayData.length} técnicos</p>
-          </div>
-        </div>
+    <ChartCard
+      icon={<Users className="w-4 h-4" />}
+      title="Chamados por Técnico"
+      subtitle={`Top ${displayData.length} técnicos`}
+      actions={
         <div className="text-right">
-          <p className="text-2xl font-bold text-minerva-navy dark:text-white">{total}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">total atendidos</p>
+          <p className="text-2xl font-bold gradient-text tabular-nums leading-none">{total}</p>
+          <p className="text-[11px] text-minerva-navy/55 dark:text-white/55 leading-tight">
+            atendidos
+          </p>
         </div>
-      </div>
-
+      }
+    >
       <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={displayData} layout="vertical" margin={{ left: 10, right: 20 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#475569' : '#e2e8f0'} horizontal={true} vertical={false} />
-          <XAxis 
-            type="number" 
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }} 
-            allowDecimals={false}
-            axisLine={false}
-            tickLine={false}
+        <BarChart data={displayData} layout="vertical" margin={{ left: 8, right: 16, top: 4 }}>
+          <ChartGradients />
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke={getGridStroke(isDark)}
+            horizontal
+            vertical={false}
           />
-          <YAxis 
-            dataKey="displayName" 
-            type="category" 
-            tick={{ fontSize: 11, fill: isDark ? '#e2e8f0' : '#1D2E40' }} 
+          <XAxis type="number" allowDecimals={false} {...getAxisProps(isDark)} />
+          <YAxis
+            dataKey="displayName"
+            type="category"
             width={140}
-            tickLine={false}
-            axisLine={false}
+            {...getAxisProps(isDark)}
+            tick={{
+              fontSize: 11,
+              fill: isDark ? '#cbd5e1' : '#1D2E40',
+              fontWeight: 500,
+            }}
           />
           <Tooltip
-            contentStyle={{
-              backgroundColor: isDark ? '#1e293b' : '#ffffff',
-              border: `1px solid ${isDark ? '#475569' : '#e2e8f0'}`,
-              borderRadius: '12px',
-              boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-              padding: '12px 16px',
-            }}
-            formatter={(value, _name, props) => [
-              <span style={{ color: isDark ? '#f1f5f9' : '#1D2E40', fontWeight: 600 }}>{value} chamados</span>,
-              <span style={{ color: isDark ? '#94a3b8' : '#64748b' }}>{props.payload.fullName || 'Técnico'}</span>
-            ]}
-            labelFormatter={() => ''}
-            cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(29, 46, 64, 0.05)' }}
+            content={
+              <GlassTooltip
+                renderItem={item => {
+                  const payload = item.payload as { fullName?: string } | undefined;
+                  return (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: item.color,
+                          boxShadow: `0 0 8px ${item.color}66`,
+                        }}
+                        aria-hidden
+                      />
+                      <span className="text-minerva-navy/70 dark:text-white/70 mr-auto">
+                        {payload?.fullName ?? 'Técnico'}
+                      </span>
+                      <span className="font-bold tabular-nums text-minerva-navy dark:text-white">
+                        {item.value}
+                      </span>
+                    </div>
+                  );
+                }}
+              />
+            }
+            cursor={{ fill: getCursorFill(isDark) }}
           />
           <Bar
             dataKey="count"
             radius={[0, 8, 8, 0]}
-            onClick={(payload) => {
+            animationDuration={800}
+            onClick={payload => {
               const tech = (payload as { fullName?: string }).fullName;
               if (tech && onSelectTechnician) onSelectTechnician(tech);
             }}
             cursor={onSelectTechnician ? 'pointer' : 'default'}
           >
             {displayData.map((entry, index) => {
-              const colors = isDark ? COLORS_DARK : COLORS_LIGHT;
               const isSelected = selectedSet.has(entry.fullName);
               const isDimmed = selectedSet.size > 0 && !isSelected;
               return (
                 <Cell
                   key={`cell-${index}`}
-                  fill={colors[index % colors.length]}
-                  fillOpacity={isDimmed ? 0.35 : 1}
+                  fill={entry.color}
+                  fillOpacity={isDimmed ? 0.30 : 0.92}
                   stroke={isSelected ? '#F84454' : 'none'}
                   strokeWidth={isSelected ? 2 : 0}
                 />
@@ -172,10 +158,10 @@ export default function TechnicianChart({
         </BarChart>
       </ResponsiveContainer>
       {onSelectTechnician && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-          Dica: clique em uma barra para filtrar.
+        <p className="text-[11px] text-minerva-navy/45 dark:text-white/45 mt-3">
+          Clique em uma barra para filtrar.
         </p>
       )}
-    </div>
+    </ChartCard>
   );
 }

@@ -11,6 +11,14 @@ import { TrendingUp } from 'lucide-react';
 import { useTheme } from '../contexts/useTheme';
 import { ForecastPoint, forecastTicketsByDate } from '../services/analytics';
 import { useMemo } from 'react';
+import {
+  ChartCard,
+  ChartGradients,
+  GRADIENT,
+  CHART_PALETTE,
+  getAxisProps,
+  getGridStroke,
+} from './charts/chartTheme';
 
 interface TimelineChartProps {
   data: { date: string; count: number }[];
@@ -30,11 +38,13 @@ export default function TimelineChart({
   const { isDark } = useTheme();
 
   const series: ChartDatum[] = useMemo(() => {
-    const base = showForecast ? forecastTicketsByDate(data, 7) : data.map(d => ({
-      date: d.date,
-      count: d.count,
-      forecast: null as number | null,
-    }));
+    const base = showForecast
+      ? forecastTicketsByDate(data, 7)
+      : data.map(d => ({
+          date: d.date,
+          count: d.count,
+          forecast: null as number | null,
+        }));
     return base.map(d => ({
       ...d,
       displayDate: new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR', {
@@ -54,149 +64,94 @@ export default function TimelineChart({
 
   if (data.length === 0) {
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-            <TrendingUp className="w-5 h-5 text-emerald-600" aria-hidden />
-          </div>
-          <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">
-            Evolução de Chamados
-          </h2>
-        </div>
-        <div className="flex items-center justify-center h-[200px] text-gray-400 dark:text-gray-500">
+      <ChartCard
+        icon={<TrendingUp className="w-4 h-4" />}
+        title="Evolução de Chamados"
+        subtitle="Sem dados"
+      >
+        <div className="flex items-center justify-center h-[200px] text-minerva-navy/40 dark:text-white/40 text-sm">
           Nenhum dado disponível para o período
         </div>
-      </div>
+      </ChartCard>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva p-6 card-hover">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-xl">
-            <TrendingUp className="w-5 h-5 text-emerald-600" aria-hidden />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold text-minerva-navy dark:text-white">
-              Evolução de Chamados
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {showForecast ? 'Histórico + projeção 7 dias' : 'Chamados abertos por dia'}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-6 flex-wrap">
-          <div className="text-right">
-            <p className="text-2xl font-bold text-minerva-navy dark:text-white">{total}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">total no período</p>
-          </div>
-          <div className="h-10 w-px bg-gray-200 dark:bg-slate-600" aria-hidden />
-          <div className="text-right">
-            <p className="text-2xl font-bold text-emerald-600">{average}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">média/dia</p>
-          </div>
-          <div className="h-10 w-px bg-gray-200 dark:bg-slate-600" aria-hidden />
-          <div className="text-right">
-            <p className="text-2xl font-bold text-minerva-red">{max}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">pico máximo</p>
-          </div>
+    <ChartCard
+      icon={<TrendingUp className="w-4 h-4" />}
+      title="Evolução de Chamados"
+      subtitle={showForecast ? 'Histórico + projeção 7 dias' : 'Chamados abertos por dia'}
+      actions={
+        <div className="flex items-center gap-4 text-right">
+          <Stat label="total" value={total} tone="navy" />
+          <Sep />
+          <Stat label="média/dia" value={average} tone="emerald" />
+          <Sep />
+          <Stat label="pico" value={max} tone="red" />
           {showForecast && projectedNextWeek > 0 && (
             <>
-              <div className="h-10 w-px bg-gray-200 dark:bg-slate-600" aria-hidden />
-              <div className="text-right">
-                <p className="text-2xl font-bold text-violet-500">≈{projectedNextWeek}</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">próx. 7 dias</p>
-              </div>
+              <Sep />
+              <Stat label="próx. 7d" value={`≈${projectedNextWeek}`} tone="violet" />
             </>
           )}
         </div>
-      </div>
-
+      }
+    >
       <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={series} margin={{ left: -10, right: 10 }}>
+        <AreaChart data={series} margin={{ left: -8, right: 8, top: 4 }}>
+          <ChartGradients />
           <defs>
-            <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor={isDark ? '#60a5fa' : '#1D2E40'} stopOpacity={0.3} />
-              <stop offset="95%" stopColor={isDark ? '#60a5fa' : '#1D2E40'} stopOpacity={0} />
-            </linearGradient>
-            <linearGradient id="colorForecast" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.25} />
-              <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
+            <linearGradient id="forecast-area" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={CHART_PALETTE.violetLight} stopOpacity={0.30} />
+              <stop offset="100%" stopColor={CHART_PALETTE.violetLight} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke={isDark ? '#475569' : '#e2e8f0'}
-            vertical={false}
-          />
-          <XAxis
-            dataKey="displayDate"
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }}
-            axisLine={{ stroke: isDark ? '#475569' : '#e2e8f0' }}
-            tickLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#64748b' }}
-            allowDecimals={false}
-            axisLine={false}
-            tickLine={false}
-          />
+          <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} vertical={false} />
+          <XAxis dataKey="displayDate" {...getAxisProps(isDark)} />
+          <YAxis allowDecimals={false} {...getAxisProps(isDark)} />
           <Tooltip
             content={({ active, payload }) => {
-              if (active && payload && payload.length) {
-                const datum = payload[0].payload as ChartDatum;
-                const isForecast = datum.count === null && datum.forecast !== null;
-                return (
-                  <div
-                    style={{
-                      backgroundColor: isDark ? '#1e293b' : '#fff',
-                      padding: '12px 16px',
-                      borderRadius: '12px',
-                      border: `1px solid ${isDark ? '#475569' : '#e2e8f0'}`,
-                      boxShadow: '0 10px 40px -10px rgba(0, 0, 0, 0.3)',
-                    }}
+              if (!active || !payload || payload.length === 0) return null;
+              const datum = payload[0].payload as ChartDatum;
+              const isForecast = datum.count === null && datum.forecast !== null;
+              return (
+                <div className="glass-card-strong rounded-xl px-3.5 py-2.5 min-w-[160px]">
+                  <p className="text-[11px] uppercase tracking-wider text-minerva-navy/55 dark:text-white/55 font-semibold mb-1.5">
+                    {isForecast ? 'Projeção · ' : ''}
+                    {datum.displayDate}
+                  </p>
+                  <p
+                    className={`text-base font-bold tabular-nums ${
+                      isForecast
+                        ? 'text-violet-500 dark:text-violet-300'
+                        : 'gradient-text'
+                    }`}
                   >
-                    <p
-                      style={{
-                        color: isDark ? '#94a3b8' : '#64748b',
-                        fontSize: '12px',
-                        marginBottom: '4px',
-                      }}
-                    >
-                      {isForecast ? 'Projeção: ' : 'Data: '}
-                      {datum.displayDate}
-                    </p>
-                    <p
-                      style={{
-                        color: isForecast ? '#a78bfa' : isDark ? '#f1f5f9' : '#1D2E40',
-                        fontSize: '16px',
-                        fontWeight: 700,
-                      }}
-                    >
-                      {isForecast ? `≈${datum.forecast}` : datum.count} chamados
-                    </p>
-                  </div>
-                );
-              }
-              return null;
+                    {isForecast ? `≈${datum.forecast}` : datum.count} chamados
+                  </p>
+                </div>
+              );
             }}
-            cursor={{ stroke: '#F84454', strokeWidth: 2, strokeDasharray: '5 5' }}
+            cursor={{ stroke: CHART_PALETTE.red, strokeWidth: 1.5, strokeDasharray: '4 4' }}
           />
           <Area
             type="monotone"
             dataKey="count"
-            stroke={isDark ? '#60a5fa' : '#1D2E40'}
-            strokeWidth={3}
-            fillOpacity={1}
-            fill="url(#colorCount)"
-            dot={{ r: 4, fill: isDark ? '#60a5fa' : '#1D2E40', strokeWidth: 2, stroke: isDark ? '#1e293b' : '#fff' }}
+            stroke={isDark ? CHART_PALETTE.skyLight : CHART_PALETTE.navy}
+            strokeWidth={2.5}
+            fill={isDark ? GRADIENT.area('sky') : GRADIENT.area('navy')}
+            animationDuration={900}
+            dot={{
+              r: 3,
+              fill: isDark ? CHART_PALETTE.skyLight : CHART_PALETTE.navy,
+              strokeWidth: 2,
+              stroke: isDark ? '#0E1822' : '#fff',
+            }}
             activeDot={{
               r: 6,
-              fill: '#F84454',
+              fill: CHART_PALETTE.red,
               strokeWidth: 2,
-              stroke: isDark ? '#1e293b' : '#fff',
+              stroke: isDark ? '#0E1822' : '#fff',
               cursor: onSelectDate ? 'pointer' : undefined,
               onClick: onSelectDate
                 ? (_evt: unknown, payload: { payload?: ChartDatum }) => {
@@ -209,21 +164,51 @@ export default function TimelineChart({
             <Area
               type="monotone"
               dataKey="forecast"
-              stroke="#a78bfa"
+              stroke={CHART_PALETTE.violetLight}
               strokeWidth={2}
               strokeDasharray="6 4"
-              fill="url(#colorForecast)"
+              fill="url(#forecast-area)"
+              animationDuration={900}
               dot={false}
-              activeDot={{ r: 5, fill: '#a78bfa' }}
+              activeDot={{ r: 5, fill: CHART_PALETTE.violetLight }}
             />
           )}
         </AreaChart>
       </ResponsiveContainer>
       {onSelectDate && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-          Dica: clique em um ponto para filtrar o dashboard pela data.
+        <p className="text-[11px] text-minerva-navy/45 dark:text-white/45 mt-3">
+          Clique em um ponto para filtrar pela data.
         </p>
       )}
+    </ChartCard>
+  );
+}
+
+function Sep() {
+  return <span className="h-8 w-px bg-minerva-navy/10 dark:bg-white/10" aria-hidden />;
+}
+
+interface StatProps {
+  label: string;
+  value: number | string;
+  tone: 'navy' | 'emerald' | 'red' | 'violet';
+}
+
+function Stat({ label, value, tone }: StatProps) {
+  const toneClass =
+    tone === 'navy'
+      ? 'text-minerva-navy dark:text-white'
+      : tone === 'emerald'
+        ? 'text-emerald-600 dark:text-emerald-300'
+        : tone === 'red'
+          ? 'text-minerva-red dark:text-rose-300'
+          : 'text-violet-500 dark:text-violet-300';
+  return (
+    <div className="text-right">
+      <p className={`text-xl font-bold tabular-nums leading-none ${toneClass}`}>{value}</p>
+      <p className="text-[10px] text-minerva-navy/55 dark:text-white/55 uppercase tracking-wider mt-0.5">
+        {label}
+      </p>
     </div>
   );
 }

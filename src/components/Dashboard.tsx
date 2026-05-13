@@ -236,23 +236,44 @@ export default function Dashboard() {
     ? `${formatDateLabel(filters.dateRange.start)} — ${formatDateLabel(filters.dateRange.end)}`
     : 'Visualizando todos os períodos';
 
-  // Loading inicial
+  // Loading inicial — Apple-style minimalista
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-minerva-gradient flex items-center justify-center">
-        <div className="text-center">
+      <div className="relative min-h-screen flex items-center justify-center bg-[var(--bg-base)]">
+        <div className="ambient-orbs" aria-hidden />
+        <div className="relative z-10 text-center px-6 animate-fade-in">
           <img
-            src={MINERVA_LOGO_LIGHT}
+            src={isDark ? MINERVA_LOGO_LIGHT : MINERVA_LOGO_DARK}
             alt="Minerva Foods"
-            className="h-16 mx-auto mb-8 animate-pulse-slow"
+            className="h-10 mx-auto mb-12 opacity-90"
           />
           <div
-            className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-minerva-red mx-auto mb-4"
             role="status"
-            aria-label="Carregando"
-          />
-          <p className="text-white font-medium">Conectando ao GLPI...</p>
-          <p className="text-white/60 text-sm mt-2">Carregando dados dos chamados</p>
+            aria-label="Conectando ao GLPI"
+            className="flex items-center justify-center gap-1.5 mb-6"
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)] animate-pulse-soft"
+              style={{ animationDelay: '0ms' }}
+              aria-hidden
+            />
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)] animate-pulse-soft"
+              style={{ animationDelay: '200ms' }}
+              aria-hidden
+            />
+            <span
+              className="w-1.5 h-1.5 rounded-full bg-[var(--text-primary)] animate-pulse-soft"
+              style={{ animationDelay: '400ms' }}
+              aria-hidden
+            />
+          </div>
+          <p className="text-[var(--text-primary)] text-base font-semibold tracking-[-0.01em]">
+            Conectando ao GLPI
+          </p>
+          <p className="text-[var(--text-secondary)] text-sm mt-1.5 max-w-xs mx-auto">
+            Carregando dados em tempo real
+          </p>
         </div>
       </div>
     );
@@ -307,8 +328,11 @@ export default function Dashboard() {
   return (
     <div
       ref={ref}
-      className={`min-h-screen bg-minerva-gradient-light dark:bg-slate-900 ${presentationMode ? 'presentation-mode' : ''}`}
+      className={`relative min-h-screen ${presentationMode ? 'bg-minerva-gradient presentation-mode overflow-hidden' : 'bg-[var(--bg-base)]'}`}
     >
+      {/* Atmosfera muito sutil — não chamativo */}
+      {!presentationMode && <div className="ambient-orbs" aria-hidden />}
+
       <DashboardHeader
         presentationMode={presentationMode}
         onTogglePresentation={toggle}
@@ -361,29 +385,29 @@ export default function Dashboard() {
 
       <main
         ref={captureRef}
-        className={`${presentationMode ? 'px-8 py-6' : 'max-w-7xl mx-auto px-6 py-8'} bg-minerva-gradient-light dark:bg-slate-900`}
+        className={`relative z-10 ${presentationMode ? 'px-10 py-8' : 'max-w-[1400px] mx-auto px-8 py-10'}`}
       >
         {/* Erro */}
         {isError && !presentationMode && (
           <div
             role="alert"
-            className="mb-8 p-5 bg-minerva-red/10 dark:bg-minerva-red/20 border border-minerva-red/30 rounded-2xl flex items-center gap-4 animate-fade-in"
+            className="mb-10 p-5 surface-elevated border-rose-500/20 bg-rose-500/[0.04] dark:bg-rose-500/[0.06] flex items-center gap-4 animate-fade-in"
           >
-            <div className="p-3 bg-minerva-red/20 rounded-xl">
-              <AlertCircle className="w-6 h-6 text-minerva-red" aria-hidden />
+            <div className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 shrink-0">
+              <AlertCircle className="w-5 h-5" aria-hidden />
             </div>
-            <div className="flex-1">
-              <p className="text-minerva-navy dark:text-white font-semibold">
+            <div className="flex-1 min-w-0">
+              <p className="text-[var(--text-primary)] font-semibold text-sm">
                 Erro ao carregar dados
               </p>
-              <p className="text-minerva-navy/70 dark:text-white/70 text-sm">
+              <p className="text-[var(--text-secondary)] text-xs mt-0.5 truncate">
                 {(error as Error)?.message ?? 'Erro desconhecido'}
               </p>
             </div>
             <button
               type="button"
               onClick={handleRefresh}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-minerva-red text-white rounded-xl font-medium hover:bg-minerva-red-dark"
+              className="primary-btn"
             >
               <RefreshCw className="w-4 h-4" aria-hidden />
               Tentar novamente
@@ -397,7 +421,7 @@ export default function Dashboard() {
         ) : (
           <>
             {/* KPIs */}
-            <div className={presentationMode ? 'mb-6' : 'mb-8'} data-export="kpis">
+            <div className={presentationMode ? 'mb-8' : 'mb-10'} data-export="kpis">
               <KPIGrid
                 metrics={metrics}
                 delta={delta}
@@ -409,15 +433,17 @@ export default function Dashboard() {
             </div>
 
             {!presentationMode && (
-              <InsightsBlock
-                insights={insights}
-                actionItems={actionItems}
-                onApplyAction={handleApplyAction}
-              />
+              <div className="mb-10">
+                <InsightsBlock
+                  insights={insights}
+                  actionItems={actionItems}
+                  onApplyAction={handleApplyAction}
+                />
+              </div>
             )}
 
             {!presentationMode && (
-              <div className="mb-6">
+              <div className="mb-10">
                 <PresetsBar
                   presets={presets}
                   onApply={applyPreset}
@@ -428,7 +454,7 @@ export default function Dashboard() {
             )}
 
             {!presentationMode ? (
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-10">
                 <div className="lg:col-span-1 animate-slide-in">
                   <TicketFilterPanel
                     filters={filters}
@@ -439,7 +465,7 @@ export default function Dashboard() {
                   />
                 </div>
 
-                <div className="lg:col-span-3 space-y-6">
+                <div className="lg:col-span-3 space-y-8">
                   <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
                     <TimelineChart
                       data={timelineData}
@@ -482,7 +508,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-8">
                 <TimelineChart data={timelineData} />
                 <PlannedVsRealizedChart data={plannedVsRealizedData} />
                 <Heatmap data={heatmapData} />
@@ -495,7 +521,7 @@ export default function Dashboard() {
             )}
 
             {!presentationMode && (
-              <div className="animate-fade-in mb-6" style={{ animationDelay: '0.35s' }}>
+              <div className="animate-fade-in mb-10" style={{ animationDelay: '0.35s' }}>
                 <TechniciansCompare
                   tickets={tickets}
                   technicians={filterOptions.technicians}
@@ -512,46 +538,42 @@ export default function Dashboard() {
         )}
 
         {!presentationMode && (
-          <footer className="mt-12 pt-8 border-t border-minerva-navy/10 dark:border-white/10">
-            <div className="flex flex-col items-center gap-5">
+          <footer className="mt-16 pt-10 border-t border-[var(--border-subtle)]">
+            <div className="flex flex-col items-center gap-4 text-center">
               <div className="flex items-center gap-3">
                 <img
                   src={isDark ? MINERVA_LOGO_LIGHT : MINERVA_LOGO_DARK}
                   alt="Minerva Foods"
-                  className="h-8 opacity-80"
+                  className="h-7 opacity-80"
                 />
-                <div className="h-6 w-px bg-minerva-navy/10 dark:bg-white/20" aria-hidden />
-                <span className="text-minerva-navy/50 dark:text-white/50 text-sm">
+                <div className="h-5 w-px bg-[var(--border-default)]" aria-hidden />
+                <span className="text-[var(--text-tertiary)] text-xs font-medium">
                   Central de Monitoramento de Chamados RPA
                 </span>
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap justify-center">
-                <span className="text-minerva-navy/40 dark:text-white/40 text-sm">
-                  Desenvolvido por
-                </span>
-                <div className="flex items-center gap-2">
-                  <a
-                    href="https://www.linkedin.com/in/levicury/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-minerva-navy/5 dark:bg-white/10 hover:bg-minerva-navy hover:text-white rounded-lg text-minerva-navy dark:text-white text-sm font-medium transition-all"
-                  >
-                    Levi Cury
-                  </a>
-                  <span className="text-minerva-navy/30 dark:text-white/30">&</span>
-                  <a
-                    href="https://www.linkedin.com/in/igor-minuncio/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-1.5 bg-minerva-navy/5 dark:bg-white/10 hover:bg-minerva-navy hover:text-white rounded-lg text-minerva-navy dark:text-white text-sm font-medium transition-all"
-                  >
-                    Igor Martins Minuncio
-                  </a>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap justify-center text-xs">
+                <span className="text-[var(--text-tertiary)]">Desenvolvido por</span>
+                <a
+                  href="https://www.linkedin.com/in/levicury/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors underline-offset-4 hover:underline"
+                >
+                  Levi Cury
+                </a>
+                <span className="text-[var(--text-tertiary)]">·</span>
+                <a
+                  href="https://www.linkedin.com/in/igor-minuncio/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium transition-colors underline-offset-4 hover:underline"
+                >
+                  Igor Martins Minuncio
+                </a>
               </div>
 
-              <p className="text-minerva-navy/30 dark:text-white/30 text-xs">
+              <p className="text-[var(--text-tertiary)] text-[11px]">
                 © {new Date().getFullYear()} Minerva Foods S.A. — Todos os direitos reservados
               </p>
             </div>

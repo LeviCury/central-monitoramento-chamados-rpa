@@ -15,21 +15,13 @@ interface KPIGridProps {
   metrics: TicketMetrics;
   delta: MetricsDelta;
   loadingHours: boolean;
-  /**
-   * True quando o numero de tickets do recorte ultrapassou o limite
-   * `maxTicketsForHours` e por isso os apontamentos nao foram buscados.
-   * Cards de horas mostram aviso em vez de "0h" enganoso.
-   */
   hoursSkipped?: boolean;
   hoursMaxLimit?: number;
   large?: boolean;
 }
 
 /**
- * Mini-pílulas Incidente / Requisição mostradas no rodapé dos cards.
- * Usa o nome completo (não abreviado) para ficar legível em qualquer
- * largura — KPIs agora ocupam 1/3 da largura mínima útil, então sobra
- * espaço.
+ * Mini-pílulas de breakdown — neutras e discretas (Apple-style).
  */
 function TypePills({ breakdown }: { breakdown: TypeBreakdown }) {
   const total = breakdown.incident + breakdown.request + breakdown.unknown;
@@ -37,26 +29,35 @@ function TypePills({ breakdown }: { breakdown: TypeBreakdown }) {
   return (
     <>
       <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-[11px] font-medium text-white"
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-subtle)]"
         title={`${breakdown.incident} incidente${breakdown.incident === 1 ? '' : 's'}`}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-300" aria-hidden />
-        Incidente {breakdown.incident}
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />
+        <span className="tnum text-[var(--text-primary)] font-semibold">
+          {breakdown.incident}
+        </span>{' '}
+        incidente
       </span>
       <span
-        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/15 text-[11px] font-medium text-white"
+        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-subtle)]"
         title={`${breakdown.request} requisiç${breakdown.request === 1 ? 'ão' : 'ões'}`}
       >
-        <span className="w-1.5 h-1.5 rounded-full bg-sky-300" aria-hidden />
-        Requisição {breakdown.request}
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" aria-hidden />
+        <span className="tnum text-[var(--text-primary)] font-semibold">
+          {breakdown.request}
+        </span>{' '}
+        requisição
       </span>
       {breakdown.unknown > 0 && (
         <span
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-[11px] font-medium text-white/80"
-          title={`${breakdown.unknown} sem tipo definido no GLPI`}
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium text-[var(--text-secondary)] bg-[var(--bg-subtle)]"
+          title={`${breakdown.unknown} sem tipo definido`}
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-white/50" aria-hidden />
-          Sem tipo {breakdown.unknown}
+          <span className="w-1.5 h-1.5 rounded-full bg-[var(--text-tertiary)]" aria-hidden />
+          <span className="tnum text-[var(--text-primary)] font-semibold">
+            {breakdown.unknown}
+          </span>{' '}
+          sem tipo
         </span>
       )}
     </>
@@ -64,7 +65,7 @@ function TypePills({ breakdown }: { breakdown: TypeBreakdown }) {
 }
 
 const PENDING_TOOLTIP =
-  'Pendente = aguardando algo externo à equipe (cliente, fornecedor ou outro time). O chamado não está mais na nossa mão.';
+  'Pendente = aguardando algo externo à equipe (cliente, fornecedor ou outro time).';
 
 interface OpenSubtitleProps {
   inProgress: number;
@@ -74,27 +75,27 @@ interface OpenSubtitleProps {
 
 function OpenSubtitle({ inProgress, pending, newTickets }: OpenSubtitleProps) {
   return (
-    <ul className="space-y-1 text-white" aria-label="Quebra dos chamados em aberto">
-      <li className="flex items-baseline gap-2 leading-snug">
-        <span className="font-semibold tabular-nums shrink-0">{inProgress}</span>
-        <span className="text-sm shrink-0">Em atendimento</span>
-        <span className="text-[11px] text-white/75">na nossa mão</span>
+    <ul className="space-y-1" aria-label="Quebra dos chamados em aberto">
+      <li className="flex items-baseline gap-2">
+        <span className="tnum font-semibold text-[var(--text-primary)] w-6 text-right shrink-0">
+          {inProgress}
+        </span>
+        <span className="text-[var(--text-secondary)]">Em atendimento</span>
       </li>
-      <li className="flex items-baseline gap-2 leading-snug">
-        <span className="font-semibold tabular-nums shrink-0">{pending}</span>
-        <span className="text-sm shrink-0">Pendentes</span>
-        <span
-          className="inline-flex items-center gap-1 text-[11px] text-white/75"
-          title={PENDING_TOOLTIP}
-        >
-          aguardando externos
-          <HelpCircle className="w-3 h-3" aria-label={PENDING_TOOLTIP} />
+      <li className="flex items-baseline gap-2">
+        <span className="tnum font-semibold text-[var(--text-primary)] w-6 text-right shrink-0">
+          {pending}
+        </span>
+        <span className="text-[var(--text-secondary)] inline-flex items-center gap-1">
+          Pendentes
+          <HelpCircle className="w-3 h-3 text-[var(--text-tertiary)]" aria-label={PENDING_TOOLTIP} />
         </span>
       </li>
-      <li className="flex items-baseline gap-2 leading-snug">
-        <span className="font-semibold tabular-nums shrink-0">{newTickets}</span>
-        <span className="text-sm shrink-0">Novos</span>
-        <span className="text-[11px] text-white/75">ainda não atribuídos</span>
+      <li className="flex items-baseline gap-2">
+        <span className="tnum font-semibold text-[var(--text-primary)] w-6 text-right shrink-0">
+          {newTickets}
+        </span>
+        <span className="text-[var(--text-secondary)]">Novos</span>
       </li>
     </ul>
   );
@@ -112,64 +113,54 @@ interface MixSubtitleProps {
 function MixSubtitle({ incident, request, unknown, dominant }: MixSubtitleProps) {
   const total = incident + request + unknown;
   if (total === 0) {
-    return <p className="text-sm text-white/80">Sem chamados no período</p>;
+    return <p className="text-[var(--text-tertiary)]">Sem chamados no período</p>;
   }
   const incPct = (incident / total) * 100;
   const reqPct = (request / total) * 100;
   const unkPct = (unknown / total) * 100;
   const headline =
     dominant === 'incident'
-      ? 'Incidentes dominam — operação reativa'
+      ? 'Operação reativa'
       : dominant === 'request'
-        ? 'Requisições dominam — projetos e melhorias'
-        : 'Demanda balanceada entre incidente e requisição';
+        ? 'Projetos & melhorias'
+        : 'Demanda balanceada';
+
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-white/85 leading-snug">{headline}</p>
+    <div className="space-y-2.5">
+      <p className="text-[var(--text-secondary)]">{headline}</p>
       <div
-        className="h-2 w-full rounded-full bg-white/15 overflow-hidden flex"
+        className="h-1.5 w-full rounded-full bg-[var(--bg-subtle)] overflow-hidden flex"
         role="img"
-        aria-label={`Distribuição: ${incident} incidente${incident === 1 ? '' : 's'}, ${request} requisição${request === 1 ? '' : 'ões'}${unknown ? `, ${unknown} sem tipo` : ''}`}
+        aria-label={`${incident} incidente${incident === 1 ? '' : 's'}, ${request} requisição${request === 1 ? '' : 'ões'}`}
       >
         {incPct > 0 && (
           <div
-            className="h-full bg-rose-300"
+            className="h-full bg-rose-500 transition-[width] duration-700 ease-out"
             style={{ width: `${incPct}%` }}
-            title={`${incident} incidente${incident === 1 ? '' : 's'}`}
           />
         )}
         {reqPct > 0 && (
           <div
-            className="h-full bg-sky-300"
+            className="h-full bg-sky-500 transition-[width] duration-700 ease-out"
             style={{ width: `${reqPct}%` }}
-            title={`${request} requisição${request === 1 ? '' : 'ões'}`}
           />
         )}
         {unkPct > 0 && (
           <div
-            className="h-full bg-white/40"
+            className="h-full bg-[var(--text-tertiary)] transition-[width] duration-700 ease-out"
             style={{ width: `${unkPct}%` }}
-            title={`${unknown} sem tipo`}
           />
         )}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/85">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--text-secondary)]">
         <span className="inline-flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-300" aria-hidden />
-          <span className="font-semibold tabular-nums">{incident}</span>{' '}
-          incidente{incident === 1 ? '' : 's'}
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />
+          <span className="tnum font-semibold text-[var(--text-primary)]">{incident}</span> incidente{incident === 1 ? '' : 's'}
         </span>
         <span className="inline-flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-300" aria-hidden />
-          <span className="font-semibold tabular-nums">{request}</span>{' '}
-          requisi{request === 1 ? 'ção' : 'ções'}
+          <span className="w-1.5 h-1.5 rounded-full bg-sky-500" aria-hidden />
+          <span className="tnum font-semibold text-[var(--text-primary)]">{request}</span> requisi{request === 1 ? 'ção' : 'ções'}
         </span>
-        {unknown > 0 && (
-          <span className="inline-flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-white/40" aria-hidden />
-            <span className="font-semibold tabular-nums">{unknown}</span> sem tipo
-          </span>
-        )}
       </div>
     </div>
   );
@@ -193,13 +184,11 @@ export function KPIGrid({
   const balanceSubtitle = balanceIsNeutral
     ? 'Realizado igual ao planejado'
     : balanceIsLoss
-      ? 'Horas realizadas acima do planejado'
+      ? 'Realizado acima do planejado'
       : 'Horas economizadas vs planejado';
 
-  const iconClass = large ? 'w-8 h-8' : 'w-6 h-6';
-  const hasComparison = delta.previous !== null;
+  const iconClass = large ? 'w-5 h-5' : 'w-4 h-4';
 
-  // Mix do período (Incidente vs Requisição)
   const mix = metrics.totalByType;
   const mixTotal = mix.incident + mix.request + mix.unknown;
   const mixIncPct = mixTotal > 0 ? (mix.incident / mixTotal) * 100 : 0;
@@ -221,130 +210,118 @@ export function KPIGrid({
         : `${Math.round(Math.max(mixIncPct, mixReqPct))}%`;
 
   return (
-    <div className="space-y-3">
-      {hasComparison && !large && (
-        <div className="flex items-center gap-2 text-xs text-minerva-navy/70 dark:text-white/70">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" aria-hidden />
-          <span>
-            Variações em <strong>%</strong> aparecem apenas em KPIs onde a comparação faz sentido
-            (Total e Taxa de Resolução). KPIs de snapshot — em aberto, médias, saldo e mix do
-            período — mostram apenas o número atual.
-          </span>
-        </div>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        <KPICard
-          title="Total de Chamados"
-          value={metrics.total}
-          subtitle={`${metrics.inProgress} em atendimento agora`}
-          breakdown={<TypePills breakdown={metrics.totalByType} />}
-          icon={<TrendingUp className={iconClass} aria-hidden />}
-          color="navy"
-          delay={0}
-          large={large}
-          delta={delta.deltas.total}
-          positiveIsGood={false}
-        />
-        <KPICard
-          title="Taxa de Resolução"
-          value={`${metrics.finalized} de ${metrics.total}`}
-          subtitle={`${metrics.closureRate}% finalizados no período`}
-          icon={<CheckCircle className={iconClass} aria-hidden />}
-          color="green"
-          delay={1}
-          large={large}
-          delta={delta.deltas.closureRate}
-          positiveIsGood
-        />
-        <KPICard
-          title="Chamados em Aberto"
-          value={metrics.open}
-          subtitleNode={
-            <OpenSubtitle
-              inProgress={metrics.inProgress}
-              pending={metrics.pending}
-              newTickets={metrics.newTickets}
-            />
-          }
-          breakdown={<TypePills breakdown={metrics.openByType} />}
-          icon={<Users className={iconClass} aria-hidden />}
-          color="amber"
-          delay={2}
-          large={large}
-        />
-        <KPICard
-          title="Média de Horas"
-          value={
-            hoursSkipped
-              ? '—'
-              : loadingHours
-                ? '...'
-                : formatHoursMinutes(metrics.avgWorkHours)
-          }
-          subtitle={
-            hoursSkipped
-              ? `Recorte com mais de ${hoursMaxLimit ?? '?'} chamados — reduza o período para carregar horas`
-              : loadingHours
-                ? 'Calculando...'
-                : `${formatHoursMinutes(metrics.totalRealizedHours)} realizadas no total`
-          }
-          icon={<Clock className={iconClass} aria-hidden />}
-          color="violet"
-          delay={3}
-          large={large}
-          loading={loadingHours}
-        />
-        <KPICard
-          title={hoursSkipped ? 'Saldo de Horas' : balanceTitle}
-          value={
-            hoursSkipped
-              ? '—'
-              : loadingHours
-                ? '...'
-                : formatHoursMinutes(Math.abs(metrics.hoursBalance))
-          }
-          subtitle={
-            hoursSkipped
-              ? `Apontamentos não buscados (${hoursMaxLimit ?? '?'} chamados é o teto)`
-              : loadingHours
-                ? 'Calculando...'
-                : balanceSubtitle
-          }
-          icon={
-            balanceIsLoss
-              ? <TrendingDown className={iconClass} aria-hidden />
-              : <TrendingUp className={iconClass} aria-hidden />
-          }
-          color={
-            hoursSkipped
-              ? 'navy'
-              : balanceIsLoss
-                ? 'red'
-                : balanceIsNeutral
-                  ? 'navy'
-                  : 'green'
-          }
-          delay={4}
-          large={large}
-          loading={loadingHours}
-        />
-        <KPICard
-          title="Mix do Período"
-          value={mixValue}
-          subtitleNode={
-            <MixSubtitle
-              incident={mix.incident}
-              request={mix.request}
-              unknown={mix.unknown}
-              dominant={mixDominant}
-            />
-          }
-          icon={<PieChart className={iconClass} aria-hidden />}
-          color="navy"
-          delay={5}
-          large={large}
-        />
-      </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <KPICard
+        title="Total de Chamados"
+        value={metrics.total}
+        subtitle={`${metrics.inProgress} em atendimento agora`}
+        breakdown={<TypePills breakdown={metrics.totalByType} />}
+        icon={<TrendingUp className={iconClass} aria-hidden />}
+        color="navy"
+        delay={0}
+        large={large}
+        delta={delta.deltas.total}
+        positiveIsGood={false}
+      />
+      <KPICard
+        title="Taxa de Resolução"
+        value={`${metrics.finalized} de ${metrics.total}`}
+        subtitle={`${metrics.closureRate}% finalizados no período`}
+        icon={<CheckCircle className={iconClass} aria-hidden />}
+        color="green"
+        delay={1}
+        large={large}
+        delta={delta.deltas.closureRate}
+        positiveIsGood
+      />
+      <KPICard
+        title="Chamados em Aberto"
+        value={metrics.open}
+        subtitleNode={
+          <OpenSubtitle
+            inProgress={metrics.inProgress}
+            pending={metrics.pending}
+            newTickets={metrics.newTickets}
+          />
+        }
+        breakdown={<TypePills breakdown={metrics.openByType} />}
+        icon={<Users className={iconClass} aria-hidden />}
+        color="amber"
+        delay={2}
+        large={large}
+      />
+      <KPICard
+        title="Média de Horas"
+        value={
+          hoursSkipped
+            ? '—'
+            : loadingHours
+              ? '...'
+              : formatHoursMinutes(metrics.avgWorkHours)
+        }
+        subtitle={
+          hoursSkipped
+            ? `Recorte com mais de ${hoursMaxLimit ?? '?'} chamados — reduza o período`
+            : loadingHours
+              ? 'Calculando…'
+              : `${formatHoursMinutes(metrics.totalRealizedHours)} realizadas no total`
+        }
+        icon={<Clock className={iconClass} aria-hidden />}
+        color="violet"
+        delay={3}
+        large={large}
+        loading={loadingHours}
+      />
+      <KPICard
+        title={hoursSkipped ? 'Saldo de Horas' : balanceTitle}
+        value={
+          hoursSkipped
+            ? '—'
+            : loadingHours
+              ? '...'
+              : formatHoursMinutes(Math.abs(metrics.hoursBalance))
+        }
+        subtitle={
+          hoursSkipped
+            ? `Apontamentos não buscados (${hoursMaxLimit ?? '?'} chamados é o teto)`
+            : loadingHours
+              ? 'Calculando…'
+              : balanceSubtitle
+        }
+        icon={
+          balanceIsLoss
+            ? <TrendingDown className={iconClass} aria-hidden />
+            : <TrendingUp className={iconClass} aria-hidden />
+        }
+        color={
+          hoursSkipped
+            ? 'navy'
+            : balanceIsLoss
+              ? 'red'
+              : balanceIsNeutral
+                ? 'navy'
+                : 'green'
+        }
+        delay={4}
+        large={large}
+        loading={loadingHours}
+      />
+      <KPICard
+        title="Mix do Período"
+        value={mixValue}
+        subtitleNode={
+          <MixSubtitle
+            incident={mix.incident}
+            request={mix.request}
+            unknown={mix.unknown}
+            dominant={mixDominant}
+          />
+        }
+        icon={<PieChart className={iconClass} aria-hidden />}
+        color="navy"
+        delay={5}
+        large={large}
+      />
     </div>
   );
 }

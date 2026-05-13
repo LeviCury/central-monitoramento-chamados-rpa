@@ -6,9 +6,13 @@ import {
   ArrowUp,
   ArrowUpDown,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Eye,
   FileText,
+  Maximize2,
+  Minimize2,
   Search,
   Tag,
 } from 'lucide-react';
@@ -17,6 +21,8 @@ import { useTheme } from '../contexts/useTheme';
 import { formatHoursMinutes } from '../utils/timeFormat';
 import { getStaleInfo } from '../services/analytics';
 
+type Density = 'comfortable' | 'compact';
+
 interface TicketTableProps {
   tickets: Ticket[];
   onSelectTicket: (ticket: Ticket) => void;
@@ -24,52 +30,59 @@ interface TicketTableProps {
 
 const GLPI_BASE_URL = 'https://central.minervafoods.com/front/ticket.form.php?id=';
 
-// Status badges (light/dark)
-const STATUS_STYLES_LIGHT: Record<string, string> = {
-  Fechado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Solucionado: 'bg-blue-50 text-blue-700 border-blue-200',
-  Novo: 'bg-violet-50 text-violet-700 border-violet-200',
-  'Em Atendimento (atribuído)': 'bg-minerva-red/10 text-minerva-red border-minerva-red/30',
-  'Em Atendimento (planejado)': 'bg-amber-50 text-amber-700 border-amber-200',
-  Pendente: 'bg-red-50 text-red-700 border-red-200',
-};
-
-const STATUS_STYLES_DARK: Record<string, string> = {
-  Fechado: 'bg-emerald-500/15 text-emerald-200 border-emerald-500/30',
-  Solucionado: 'bg-blue-500/15 text-blue-200 border-blue-500/30',
-  Novo: 'bg-violet-500/15 text-violet-200 border-violet-500/30',
-  'Em Atendimento (atribuído)': 'bg-minerva-red/20 text-rose-200 border-minerva-red/40',
-  'Em Atendimento (planejado)': 'bg-amber-500/15 text-amber-200 border-amber-500/30',
-  Pendente: 'bg-red-500/15 text-red-200 border-red-500/30',
-};
-
-// Dot colorido na frente do badge de status
-const STATUS_DOTS: Record<string, string> = {
+// Stripe lateral colorido por status (acompanha cor do badge)
+const STATUS_STRIPE: Record<string, string> = {
   Fechado: 'bg-emerald-500',
-  Solucionado: 'bg-blue-500',
+  Solucionado: 'bg-sky-500',
   Novo: 'bg-violet-500',
   'Em Atendimento (atribuído)': 'bg-minerva-red',
   'Em Atendimento (planejado)': 'bg-amber-500',
-  Pendente: 'bg-red-500',
+  Pendente: 'bg-rose-500',
 };
 
-// Tipo: Incidente vs Requisição
+const STATUS_STYLES_LIGHT: Record<string, string> = {
+  Fechado: 'bg-emerald-500/10 text-emerald-700',
+  Solucionado: 'bg-sky-500/10 text-sky-700',
+  Novo: 'bg-violet-500/10 text-violet-700',
+  'Em Atendimento (atribuído)': 'bg-rose-500/10 text-rose-700',
+  'Em Atendimento (planejado)': 'bg-amber-500/10 text-amber-700',
+  Pendente: 'bg-rose-500/10 text-rose-700',
+};
+
+const STATUS_STYLES_DARK: Record<string, string> = {
+  Fechado: 'bg-emerald-500/15 text-emerald-300',
+  Solucionado: 'bg-sky-500/15 text-sky-300',
+  Novo: 'bg-violet-500/15 text-violet-300',
+  'Em Atendimento (atribuído)': 'bg-rose-500/15 text-rose-300',
+  'Em Atendimento (planejado)': 'bg-amber-500/15 text-amber-300',
+  Pendente: 'bg-rose-500/15 text-rose-300',
+};
+
+const STATUS_DOTS: Record<string, string> = {
+  Fechado: 'bg-emerald-500',
+  Solucionado: 'bg-sky-500',
+  Novo: 'bg-violet-500',
+  'Em Atendimento (atribuído)': 'bg-minerva-red',
+  'Em Atendimento (planejado)': 'bg-amber-500',
+  Pendente: 'bg-rose-500',
+};
+
 const TYPE_STYLES_LIGHT: Record<TicketType, string> = {
-  incident: 'bg-rose-50 text-rose-700 border-rose-200',
-  request: 'bg-sky-50 text-sky-700 border-sky-200',
-  unknown: 'bg-gray-100 text-gray-600 border-gray-200',
+  incident: 'bg-rose-500/10 text-rose-700',
+  request: 'bg-sky-500/10 text-sky-700',
+  unknown: 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]',
 };
 
 const TYPE_STYLES_DARK: Record<TicketType, string> = {
-  incident: 'bg-rose-500/15 text-rose-200 border-rose-500/30',
-  request: 'bg-sky-500/15 text-sky-200 border-sky-500/30',
-  unknown: 'bg-slate-500/15 text-slate-300 border-slate-500/30',
+  incident: 'bg-rose-500/15 text-rose-300',
+  request: 'bg-sky-500/15 text-sky-300',
+  unknown: 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]',
 };
 
 const TYPE_DOTS: Record<TicketType, string> = {
   incident: 'bg-rose-500',
   request: 'bg-sky-500',
-  unknown: 'bg-gray-400',
+  unknown: 'bg-slate-400',
 };
 
 const TYPE_LABEL: Record<TicketType, string> = {
@@ -78,22 +91,22 @@ const TYPE_LABEL: Record<TicketType, string> = {
   unknown: 'Sem tipo',
 };
 
-// Avatar circular com a inicial — gera uma cor estável a partir do nome.
-const AVATAR_PALETTE = [
-  'bg-rose-500',
-  'bg-amber-500',
-  'bg-emerald-500',
-  'bg-sky-500',
-  'bg-violet-500',
-  'bg-fuchsia-500',
-  'bg-teal-500',
-  'bg-orange-500',
+// Avatar circular gradient com iniciais.
+const AVATAR_GRADIENTS = [
+  'from-rose-400 to-rose-600',
+  'from-amber-400 to-amber-600',
+  'from-emerald-400 to-emerald-600',
+  'from-sky-400 to-sky-600',
+  'from-violet-400 to-violet-600',
+  'from-fuchsia-400 to-fuchsia-600',
+  'from-teal-400 to-teal-600',
+  'from-orange-400 to-orange-600',
 ];
 
-function avatarColor(name: string): string {
+function avatarGradient(name: string): string {
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+  return AVATAR_GRADIENTS[hash % AVATAR_GRADIENTS.length];
 }
 
 type SortKey =
@@ -133,7 +146,6 @@ function getSortValue(ticket: Ticket, key: SortKey): string | number {
     case 'title':
       return ticket.title?.toLowerCase() ?? '';
     case 'type':
-      // Ordem natural: Incidente (0) → Requisição (1) → Sem tipo (2)
       return ticket.type === 'incident' ? 0 : ticket.type === 'request' ? 1 : 2;
     case 'status':
       return ticket.status?.toLowerCase() ?? '';
@@ -155,22 +167,20 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sort, setSort] = useState<SortState>({ key: 'opened', dir: 'desc' });
+  const [density, setDensity] = useState<Density>('comfortable');
   const itemsPerPage = 15;
 
   const getStatusBadgeStyle = (status: string) => {
     const styles = isDark ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
-    const fallback = isDark
-      ? 'bg-gray-500/15 text-gray-300 border-gray-500/30'
-      : 'bg-gray-100 text-gray-700 border-gray-200';
+    const fallback = 'bg-[var(--bg-subtle)] text-[var(--text-secondary)]';
     return styles[status] ?? fallback;
   };
 
-  const getStatusDot = (status: string) => STATUS_DOTS[status] ?? 'bg-gray-400';
+  const getStatusDot = (status: string) => STATUS_DOTS[status] ?? 'bg-slate-400';
+  const getStatusStripe = (status: string) => STATUS_STRIPE[status] ?? 'bg-slate-400';
 
-  const getTypeBadgeStyle = (type: TicketType) => {
-    const styles = isDark ? TYPE_STYLES_DARK : TYPE_STYLES_LIGHT;
-    return styles[type];
-  };
+  const getTypeBadgeStyle = (type: TicketType) =>
+    (isDark ? TYPE_STYLES_DARK : TYPE_STYLES_LIGHT)[type];
 
   const filtered = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -200,8 +210,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR', {
+    return new Date(dateStr).toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
       year: '2-digit',
@@ -210,8 +219,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
 
   const formatTime = (dateStr: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('pt-BR', {
+    return new Date(dateStr).toLocaleTimeString('pt-BR', {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -250,26 +258,33 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
     setCurrentPage(1);
   };
 
+  const cellPad = density === 'compact' ? 'py-2.5 px-4' : 'py-4 px-5';
+
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-minerva overflow-hidden border border-gray-100 dark:border-slate-700">
-      {/* Header com título, contador e busca */}
-      <div className="px-6 py-5 bg-gradient-to-r from-minerva-navy to-minerva-navy-light">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white/10 rounded-xl">
-              <FileText className="w-5 h-5 text-white" aria-hidden />
-            </div>
+    <div className="surface-elevated rounded-3xl overflow-hidden">
+      {/* Header neutro, Apple-style */}
+      <div className="px-7 pt-6 pb-5 border-b border-[var(--border-subtle)]">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)] shrink-0 mt-0.5">
+              <FileText className="w-4 h-4" aria-hidden />
+            </span>
             <div>
-              <h2 className="text-lg font-semibold text-white">Lista de Chamados</h2>
-              <p className="text-white/60 text-sm">
-                {sorted.length.toLocaleString('pt-BR')} chamado{sorted.length === 1 ? '' : 's'} encontrado{sorted.length === 1 ? '' : 's'}
+              <h2 className="text-[15px] font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
+                Lista de Chamados
+              </h2>
+              <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                <span className="font-semibold text-[var(--text-secondary)] tnum">
+                  {sorted.length.toLocaleString('pt-BR')}
+                </span>{' '}
+                chamado{sorted.length === 1 ? '' : 's'} encontrado{sorted.length === 1 ? '' : 's'}
                 {searchTerm && (
                   <>
                     {' · '}
                     <button
                       type="button"
                       onClick={() => setSearchTerm('')}
-                      className="underline underline-offset-2 hover:text-white"
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline underline-offset-2"
                     >
                       limpar busca
                     </button>
@@ -279,22 +294,59 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
             </div>
           </div>
 
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/50"
-              aria-hidden
-            />
-            <input
-              type="search"
-              aria-label="Buscar chamados por ID, título ou técnico"
-              placeholder="Buscar por ID, título ou técnico..."
-              value={searchTerm}
-              onChange={e => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full md:w-80 pl-10 pr-4 py-2.5 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/15 transition-all"
-            />
+          <div className="flex items-center gap-2 flex-wrap">
+            <div
+              role="radiogroup"
+              aria-label="Densidade da tabela"
+              className="inline-flex items-center p-0.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={density === 'comfortable'}
+                onClick={() => setDensity('comfortable')}
+                title="Confortável"
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all ${
+                  density === 'comfortable'
+                    ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-subtle'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Maximize2 className="w-3.5 h-3.5" aria-hidden />
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={density === 'compact'}
+                onClick={() => setDensity('compact')}
+                title="Compacto"
+                className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all ${
+                  density === 'compact'
+                    ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-subtle'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Minimize2 className="w-3.5 h-3.5" aria-hidden />
+              </button>
+            </div>
+
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-tertiary)]"
+                aria-hidden
+              />
+              <input
+                type="search"
+                aria-label="Buscar chamados por ID, título ou técnico"
+                placeholder="Buscar por ID, título ou técnico…"
+                value={searchTerm}
+                onChange={e => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full md:w-72 pl-9 pr-3 py-1.5 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-xl text-[var(--text-primary)] placeholder-[var(--text-tertiary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ring-color)] focus:border-transparent transition-all"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -302,30 +354,37 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
       {/* Tabela */}
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-slate-900/40 border-b border-gray-100 dark:border-slate-700">
+          <thead className="sticky top-0 z-10 glass-strong border-b border-[var(--border-subtle)]">
+            <tr>
+              <th className="w-1 p-0" aria-hidden />
               {COLUMNS.map(col => {
                 const active = sort.key === col.key;
-                const SortIcon = active ? (sort.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+                const SortIcon = active
+                  ? sort.dir === 'asc'
+                    ? ArrowUp
+                    : ArrowDown
+                  : ArrowUpDown;
                 return (
                   <th
                     key={col.key}
                     scope="col"
-                    className={`text-${col.align ?? 'left'} py-3 px-5 text-[11px] font-semibold text-minerva-navy/70 dark:text-white/70 uppercase tracking-wider`}
+                    className={`text-${col.align ?? 'left'} ${cellPad} text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider-2`}
                   >
                     <button
                       type="button"
                       onClick={() => handleSort(col.key)}
-                      aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      aria-sort={
+                        active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'
+                      }
                       className={`inline-flex items-center gap-1.5 transition-colors ${
                         active
-                          ? 'text-minerva-red dark:text-minerva-red-light'
-                          : 'hover:text-minerva-red dark:hover:text-minerva-red-light'
+                          ? 'text-[var(--text-primary)]'
+                          : 'hover:text-[var(--text-primary)]'
                       }`}
                     >
                       {col.label}
                       <SortIcon
-                        className={`w-3 h-3 ${active ? '' : 'opacity-50'}`}
+                        className={`w-3 h-3 ${active ? '' : 'opacity-40'}`}
                         aria-hidden
                       />
                     </button>
@@ -334,63 +393,93 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
               })}
               <th
                 scope="col"
-                className="text-center py-3 px-5 text-[11px] font-semibold text-minerva-navy/70 dark:text-white/70 uppercase tracking-wider"
+                className={`text-center ${cellPad} text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider-2`}
               >
                 Ações
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60">
+          <tbody className="divide-y divide-[var(--border-subtle)]">
             {displayed.length === 0 ? (
               <tr>
                 <td
-                  colSpan={COLUMNS.length + 1}
-                  className="py-12 text-center text-gray-400 dark:text-gray-500"
+                  colSpan={COLUMNS.length + 2}
+                  className="py-20 text-center"
                 >
-                  <FileText className="w-12 h-12 mx-auto mb-3 opacity-30" aria-hidden />
-                  <p>Nenhum chamado encontrado</p>
+                  <div className="flex flex-col items-center gap-5">
+                    <img
+                      src="/icons/empty-tickets.svg"
+                      alt=""
+                      className="w-24 h-24 opacity-60"
+                      aria-hidden
+                    />
+                    <div>
+                      <p className="text-base font-semibold text-[var(--text-primary)] tracking-[-0.01em]">
+                        Nenhum chamado encontrado
+                      </p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1.5 max-w-sm mx-auto">
+                        {searchTerm
+                          ? 'Tente outro termo de busca ou limpe os filtros.'
+                          : 'Ajuste os filtros à esquerda para refinar a visualização.'}
+                      </p>
+                    </div>
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchTerm('')}
+                        className="ghost-btn"
+                      >
+                        Limpar busca
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ) : (
-              displayed.map((ticket, index) => {
+              displayed.map(ticket => {
                 const hoursWarning = getHoursWarning(ticket);
                 const stale = getStaleInfo(ticket);
                 const techDisplay = formatTechnicianName(ticket.assigned_technician);
                 const isUnassigned = techDisplay === 'Não atribuído';
+                const stripeClass = getStatusStripe(ticket.status);
+
                 return (
                   <tr
                     key={ticket.id}
-                    className="group hover:bg-gray-50/80 dark:hover:bg-slate-700/40 transition-colors"
-                    style={{ animationDelay: `${index * 0.03}s` }}
+                    className="group relative hover:bg-[var(--bg-subtle)] transition-colors"
                   >
-                    {/* ID */}
-                    <td className="py-3.5 px-5">
-                      <span className="font-mono text-xs text-minerva-navy dark:text-white font-semibold tabular-nums whitespace-nowrap inline-flex items-center px-2 py-1 rounded-md bg-minerva-navy/5 dark:bg-white/5 border border-minerva-navy/10 dark:border-white/10">
+                    <td className="w-1 p-0 relative">
+                      <span
+                        className={`absolute inset-y-2 left-0 w-0.5 rounded-r-full ${stripeClass} opacity-0 group-hover:opacity-100 transition-opacity`}
+                        aria-hidden
+                      />
+                    </td>
+
+                    <td className={cellPad}>
+                      <span className="font-mono text-[11px] text-[var(--text-secondary)] font-semibold tnum whitespace-nowrap">
                         #{ticket.id}
                       </span>
                     </td>
 
-                    {/* Título — link pro GLPI */}
-                    <td className="py-3.5 px-5">
+                    <td className={cellPad}>
                       <a
                         href={`${GLPI_BASE_URL}${ticket.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-minerva-navy dark:text-white hover:text-minerva-red dark:hover:text-minerva-red-light font-medium transition-colors flex items-start gap-2 max-w-xl"
+                        className="text-sm text-[var(--text-primary)] hover:underline underline-offset-2 font-medium transition-colors flex items-start gap-2 max-w-xl"
                         title={ticket.title}
                       >
                         <span className="line-clamp-2 leading-snug">{ticket.title}</span>
                         <ExternalLink
-                          className="w-3.5 h-3.5 mt-0.5 opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0"
+                          className="w-3 h-3 mt-1 opacity-0 group-hover:opacity-50 transition-opacity flex-shrink-0"
                           aria-hidden
                         />
                       </a>
                     </td>
 
-                    {/* Tipo */}
-                    <td className="py-3.5 px-5">
+                    <td className={cellPad}>
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-md border whitespace-nowrap ${getTypeBadgeStyle(ticket.type)}`}
+                        className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium rounded-md whitespace-nowrap ${getTypeBadgeStyle(ticket.type)}`}
                         title={
                           ticket.type === 'incident'
                             ? 'Incidente — algo quebrou na operação'
@@ -407,11 +496,10 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                       </span>
                     </td>
 
-                    {/* Status (+ avisos) */}
-                    <td className="py-3.5 px-5">
+                    <td className={cellPad}>
                       <div className="flex flex-col gap-1.5">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-md border w-fit ${getStatusBadgeStyle(ticket.status)}`}
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-medium rounded-md w-fit ${getStatusBadgeStyle(ticket.status)}`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${getStatusDot(ticket.status)}`}
@@ -421,7 +509,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                         </span>
                         {stale.isStale && (
                           <span
-                            className="inline-flex items-center gap-1 text-[11px] text-minerva-red dark:text-rose-300 font-medium"
+                            className="inline-flex items-center gap-1 text-[10px] text-rose-600 dark:text-rose-400 font-medium"
                             title={`Em aberto há ${Math.floor(stale.daysOpen)} dias`}
                           >
                             <AlarmClock className="w-3 h-3" aria-hidden />
@@ -429,7 +517,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                           </span>
                         )}
                         {hoursWarning && (
-                          <span className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-300">
+                          <span className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400">
                             <AlertTriangle className="w-3 h-3" aria-hidden />
                             {hoursWarning}
                           </span>
@@ -437,22 +525,23 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                       </div>
                     </td>
 
-                    {/* Técnico — avatar com inicial + nome */}
-                    <td className="py-3.5 px-5">
+                    <td className={cellPad}>
                       <div className="flex items-center gap-2.5">
                         <span
-                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-semibold text-white ${
-                            isUnassigned ? 'bg-gray-400 dark:bg-slate-500' : avatarColor(techDisplay)
+                          className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-[10px] font-semibold text-white shrink-0 ${
+                            isUnassigned
+                              ? 'bg-[var(--bg-subtle)] text-[var(--text-tertiary)]'
+                              : `bg-gradient-to-br ${avatarGradient(techDisplay)}`
                           }`}
                           aria-hidden
                         >
                           {technicianInitials(techDisplay)}
                         </span>
                         <span
-                          className={`text-sm ${
+                          className={`text-[13px] ${
                             isUnassigned
-                              ? 'italic text-gray-400 dark:text-gray-500'
-                              : 'text-gray-700 dark:text-gray-200'
+                              ? 'italic text-[var(--text-tertiary)]'
+                              : 'text-[var(--text-primary)]'
                           }`}
                         >
                           {techDisplay}
@@ -460,68 +549,61 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                       </div>
                     </td>
 
-                    {/* Horas planejadas */}
-                    <td className="py-3.5 px-5 text-center">
+                    <td className={`${cellPad} text-center`}>
                       <span
-                        className={`text-sm font-semibold tabular-nums ${
+                        className={`text-[13px] font-medium tnum ${
                           ticket.planned_time_hours > 0
-                            ? 'text-minerva-navy dark:text-white'
-                            : 'text-gray-300 dark:text-slate-600'
+                            ? 'text-[var(--text-primary)]'
+                            : 'text-[var(--text-tertiary)] opacity-50'
                         }`}
                       >
                         {formatHoursMinutes(ticket.planned_time_hours)}
                       </span>
                     </td>
-
-                    {/* Horas realizadas */}
-                    <td className="py-3.5 px-5 text-center">
+                    <td className={`${cellPad} text-center`}>
                       <span
-                        className={`text-sm font-semibold tabular-nums ${
+                        className={`text-[13px] font-medium tnum ${
                           ticket.realized_time_hours > 0
-                            ? 'text-emerald-600 dark:text-emerald-300'
-                            : 'text-gray-300 dark:text-slate-600'
+                            ? 'text-emerald-600 dark:text-emerald-400'
+                            : 'text-[var(--text-tertiary)] opacity-50'
                         }`}
                       >
                         {formatHoursMinutes(ticket.realized_time_hours)}
                       </span>
                     </td>
-
-                    {/* Horas legado */}
-                    <td className="py-3.5 px-5 text-center">
+                    <td className={`${cellPad} text-center`}>
                       <span
-                        className={`text-sm font-semibold tabular-nums ${
+                        className={`text-[13px] font-medium tnum ${
                           ticket.legacy_time_hours > 0
-                            ? 'text-amber-600 dark:text-amber-300'
-                            : 'text-gray-300 dark:text-slate-600'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-[var(--text-tertiary)] opacity-50'
                         }`}
                       >
                         {formatHoursMinutes(ticket.legacy_time_hours)}
                       </span>
                     </td>
 
-                    {/* Data abertura */}
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <Calendar className="w-3.5 h-3.5 opacity-60" aria-hidden />
+                    <td className={cellPad}>
+                      <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                        <Calendar className="w-3 h-3 opacity-40" aria-hidden />
                         <div className="flex flex-col leading-tight">
-                          <span className="font-medium tabular-nums">
+                          <span className="font-medium tnum">
                             {formatDate(ticket.created_at)}
                           </span>
-                          <span className="text-[10px] tabular-nums text-gray-400 dark:text-gray-500">
+                          <span className="text-[10px] tnum text-[var(--text-tertiary)]">
                             {formatTime(ticket.created_at)}
                           </span>
                         </div>
                       </div>
                     </td>
 
-                    {/* Ações */}
-                    <td className="py-3.5 px-5">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className={cellPad}>
+                      <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
                         <button
                           type="button"
                           onClick={() => onSelectTicket(ticket)}
                           aria-label={`Ver detalhes do chamado ${ticket.id}`}
-                          className="inline-flex items-center justify-center w-8 h-8 bg-minerva-navy/5 dark:bg-white/5 hover:bg-minerva-navy hover:text-white text-minerva-navy dark:text-white rounded-lg transition-all"
+                          className="inline-flex items-center justify-center w-7 h-7 bg-[var(--bg-subtle)] hover:bg-[var(--text-primary)] hover:text-[var(--bg-elevated)] text-[var(--text-secondary)] rounded-lg transition-all"
                           title="Ver detalhes"
                         >
                           <Eye className="w-3.5 h-3.5" aria-hidden />
@@ -531,7 +613,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Abrir chamado ${ticket.id} no GLPI`}
-                          className="inline-flex items-center justify-center w-8 h-8 bg-minerva-navy/5 dark:bg-white/5 hover:bg-minerva-red hover:text-white text-minerva-navy dark:text-white rounded-lg transition-all"
+                          className="inline-flex items-center justify-center w-7 h-7 bg-[var(--bg-subtle)] hover:bg-[var(--text-primary)] hover:text-[var(--bg-elevated)] text-[var(--text-secondary)] rounded-lg transition-all"
                           title="Abrir no GLPI"
                         >
                           <ExternalLink className="w-3.5 h-3.5" aria-hidden />
@@ -546,76 +628,80 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
         </table>
       </div>
 
-      {/* Legenda + paginação */}
-      <div className="px-6 py-4 bg-gray-50 dark:bg-slate-900/30 border-t border-gray-100 dark:border-slate-700 flex items-center justify-between flex-wrap gap-3">
-        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+      <div className="px-7 py-4 border-t border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-tertiary)]">
           {totalPages > 1 && (
             <p>
-              Mostrando <span className="font-medium text-minerva-navy dark:text-white">{startIndex + 1}</span>
-              –<span className="font-medium text-minerva-navy dark:text-white">
+              Mostrando{' '}
+              <span className="font-semibold text-[var(--text-primary)] tnum">
+                {startIndex + 1}
+              </span>
+              –
+              <span className="font-semibold text-[var(--text-primary)] tnum">
                 {Math.min(startIndex + itemsPerPage, sorted.length)}
               </span>{' '}
-              de <span className="font-medium text-minerva-navy dark:text-white">{sorted.length}</span>
+              de{' '}
+              <span className="font-semibold text-[var(--text-primary)] tnum">
+                {sorted.length}
+              </span>
             </p>
           )}
-          <div className="hidden md:flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5">
-              <Tag className="w-3 h-3 opacity-70" aria-hidden />
-              <span className="inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />
-                Incidente
-              </span>
-              <span className="text-gray-300 dark:text-gray-600">·</span>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-sky-500" aria-hidden />
-                Requisição
-              </span>
+          <div className="hidden md:flex items-center gap-2 text-[var(--text-tertiary)]">
+            <Tag className="w-3 h-3 opacity-50" aria-hidden />
+            <span className="inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />
+              Incidente
+            </span>
+            <span className="opacity-40">·</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-500" aria-hidden />
+              Requisição
             </span>
           </div>
         </div>
+
         {totalPages > 1 && (
-          <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-0.5 p-0.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium text-minerva-navy dark:text-white bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              aria-label="Página anterior"
             >
-              Anterior
+              <ChevronLeft className="w-3.5 h-3.5" aria-hidden />
             </button>
-
-            <div className="flex items-center gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) pageNum = i + 1;
-                else if (currentPage <= 3) pageNum = i + 1;
-                else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
-                else pageNum = currentPage - 2 + i;
-                return (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    onClick={() => setCurrentPage(pageNum)}
-                    aria-current={currentPage === pageNum ? 'page' : undefined}
-                    className={`w-9 h-9 text-sm font-medium rounded-lg transition-all tabular-nums ${
-                      currentPage === pageNum
-                        ? 'bg-minerva-navy text-white shadow-sm'
-                        : 'text-minerva-navy dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
-
+            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+              let pageNum: number;
+              if (totalPages <= 5) pageNum = i + 1;
+              else if (currentPage <= 3) pageNum = i + 1;
+              else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+              else pageNum = currentPage - 2 + i;
+              const isCurrent = currentPage === pageNum;
+              return (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  aria-current={isCurrent ? 'page' : undefined}
+                  className={`min-w-[1.75rem] h-7 px-2 rounded-lg text-xs font-semibold tnum transition-all ${
+                    isCurrent
+                      ? 'bg-[var(--bg-elevated)] text-[var(--text-primary)] shadow-subtle'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
             <button
               type="button"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium text-minerva-navy dark:text-white bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              aria-label="Próxima página"
             >
-              Próximo
+              <ChevronRight className="w-3.5 h-3.5" aria-hidden />
             </button>
           </div>
         )}
