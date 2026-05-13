@@ -212,6 +212,7 @@ export default function Dashboard() {
         dateRange: filters.dateRange,
         insights,
         actionItems,
+        delta,
       });
       pushToast('Relatório Excel gerado', 'success');
     } catch (err) {

@@ -83,24 +83,24 @@ function DeltaPill({ delta, positiveIsGood = true }: DeltaPillProps) {
   );
 }
 
+/**
+ * Anima APENAS números puros (count-up). Strings (ex.: "40 de 48",
+ * "1h 43m", "67%") são renderizadas direto — animar texto formatado
+ * com regex é frágil e pode mascarar valores reais.
+ *
+ * A regra do hook é simples:
+ *   value: number  → animação 0 → value
+ *   value: string  → renderiza tal e qual
+ *
+ * Para preservar a hierarquia de hooks, useCountUp é sempre chamado
+ * (com 0 quando irrelevante), mas seu resultado é IGNORADO em strings.
+ */
 function useAnimatedValue(value: number | string): string | number {
-  const numericValue = typeof value === 'number' ? value : NaN;
-  const { formatted } = useCountUp(Number.isFinite(numericValue) ? numericValue : 0, {
+  const isPureNumber = typeof value === 'number' && Number.isFinite(value);
+  const { formatted } = useCountUp(isPureNumber ? (value as number) : 0, {
     durationMs: 1100,
   });
-
-  if (typeof value === 'number' && Number.isFinite(value)) return formatted;
-
-  if (typeof value === 'string') {
-    const match = value.match(/^(\d[\d.,]*)\s*(.*)$/);
-    if (match) {
-      const num = Number(match[1].replace(/\./g, '').replace(',', '.'));
-      if (Number.isFinite(num)) {
-        return `${formatted}${match[2] ? ' ' + match[2] : ''}`;
-      }
-    }
-  }
-  return value;
+  return isPureNumber ? formatted : value;
 }
 
 export function KPICard({

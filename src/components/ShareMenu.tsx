@@ -201,13 +201,13 @@ export function ShareMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Compartilhar dashboard"
-        className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl text-white font-medium transition-all disabled:opacity-50 hover:scale-105"
+        className="primary-btn inline-flex items-center gap-2 h-9 px-3.5 text-[13px] disabled:opacity-50 disabled:cursor-not-allowed"
         title="Compartilhar / Exportar"
       >
         {anyBusy ? (
-          <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
         ) : (
-          <Share2 className="w-4 h-4" aria-hidden />
+          <Share2 className="w-3.5 h-3.5" aria-hidden />
         )}
         Compartilhar
       </button>
@@ -215,9 +215,18 @@ export function ShareMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 mt-2 w-72 rounded-2xl bg-white dark:bg-slate-800 shadow-minerva-lg border border-minerva-navy/10 dark:border-white/10 z-50 overflow-hidden"
+          className="absolute right-0 mt-2 w-80 rounded-2xl bg-[var(--bg-elevated)] shadow-lifted ring-1 ring-[var(--border-subtle)] z-50 overflow-hidden animate-fade-in-up"
+          style={{ animationDuration: '180ms' }}
         >
-          <ul>
+          <div className="px-4 pt-3.5 pb-2 border-b border-[var(--border-subtle)]">
+            <p className="text-[10px] font-semibold uppercase tracking-wider-2 text-[var(--text-tertiary)]">
+              Compartilhar painel
+            </p>
+            <p className="text-[12px] text-[var(--text-secondary)] mt-0.5 leading-snug">
+              Escolha um formato. Tudo é gerado a partir dos dados atuais.
+            </p>
+          </div>
+          <ul className="py-1.5">
             {items.map(it => {
               const Icon = it.icon;
               const itemBusy = busy === it.id;
@@ -228,20 +237,21 @@ export function ShareMenu({
                     role="menuitem"
                     onClick={it.onClick}
                     disabled={anyBusy}
-                    className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-minerva-navy/5 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full text-left px-3 py-2.5 mx-1.5 rounded-lg flex items-start gap-3 hover:bg-[var(--bg-subtle)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors group"
+                    style={{ width: 'calc(100% - 12px)' }}
                   >
-                    <span className="shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-minerva-navy/10 dark:bg-white/10 flex items-center justify-center text-minerva-navy dark:text-white">
+                    <span className="shrink-0 mt-0.5 w-7 h-7 rounded-md bg-[var(--bg-subtle)] flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
                       {itemBusy ? (
-                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
                       ) : (
-                        <Icon className="w-4 h-4" aria-hidden />
+                        <Icon className="w-3.5 h-3.5" aria-hidden strokeWidth={2.2} />
                       )}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-sm font-semibold text-minerva-navy dark:text-white">
+                      <span className="block text-[13px] font-semibold text-[var(--text-primary)] tracking-[-0.005em]">
                         {it.label}
                       </span>
-                      <span className="block text-xs text-slate-500 dark:text-slate-400">
+                      <span className="block text-[11.5px] text-[var(--text-tertiary)] mt-0.5 leading-snug">
                         {it.description}
                       </span>
                     </span>

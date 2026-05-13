@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   'Pendente': 'FFEF4444',
 };
 
-import type { ActionItem, Insight, TicketMetrics } from './analytics';
+import type { ActionItem, Insight, MetricsDelta, TicketMetrics } from './analytics';
 import { getTechnicianMetrics, getUniqueTechnicians } from './analytics';
 
 interface ExportOptions {
@@ -39,6 +39,20 @@ interface ExportOptions {
   fileName?: string;
   insights?: Insight[];
   actionItems?: ActionItem[];
+  /** Comparativo opcional com o período anterior — pinta deltas no Resumo. */
+  delta?: MetricsDelta;
+}
+
+/**
+ * Formata delta numérico como string ASCII-segura ("+12.3%" / "-5%" / "—").
+ * Valores fora de Number são representados como travessão.
+ */
+function formatDeltaCell(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (value === 0) return '+/- 0%';
+  const sign = value > 0 ? '+' : '-';
+  const abs = Math.abs(value);
+  return `${sign}${abs.toFixed(abs % 1 === 0 ? 0 : 1)}%`;
 }
 
 function formatDate(dateStr: string): string {
@@ -104,6 +118,7 @@ export async function exportToExcel({
   fileName,
   insights = [],
   actionItems = [],
+  delta,
 }: ExportOptions): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Central de Monitoramento RPA - Minerva Foods';
@@ -167,50 +182,137 @@ export async function exportToExcel({
   // ==========================================
   summarySheet.mergeCells('B6:F6');
   const kpiTitleCell = summarySheet.getCell('B6');
-  kpiTitleCell.value = '📊 INDICADORES PRINCIPAIS';
+  kpiTitleCell.value = 'INDICADORES PRINCIPAIS';
   kpiTitleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: COLORS.navy } };
   kpiTitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
   summarySheet.getRow(6).height = 30;
 
-  // KPI Cards
-  const kpis = [
-    { label: 'Total de Chamados', value: metrics.total.toString(), color: COLORS.navy },
-    { label: 'Taxa de Resolução', value: `${metrics.closureRate}%`, color: COLORS.green },
-    { label: 'Em Aberto', value: (metrics.inProgress + metrics.pending + metrics.newTickets).toString(), color: COLORS.amber },
-    { label: 'Finalizados', value: (metrics.closed + metrics.solved).toString(), color: COLORS.emerald },
+  // Mix de tipo (Incidente vs Requisição) — calculado uma vez
+  const mix = metrics.totalByType;
+  const mixTotalAll = mix.incident + mix.request + mix.unknown;
+  const mixIncPct = mixTotalAll > 0 ? (mix.incident / mixTotalAll) * 100 : 0;
+  const mixReqPct = mixTotalAll > 0 ? (mix.request / mixTotalAll) * 100 : 0;
+  const mixDiff = Math.abs(mixIncPct - mixReqPct);
+  const mixHeadline =
+    mixTotalAll === 0
+      ? 'Sem chamados no período'
+      : mixDiff < 10
+        ? '~50%/50% Inc/Req — demanda balanceada'
+        : mixIncPct > mixReqPct
+          ? `${Math.round(mixIncPct)}% Incidentes — operação reativa`
+          : `${Math.round(mixReqPct)}% Requisições — projetos & melhorias`;
+
+  // Saldo de Horas formatado com sinal explícito
+  const balanceLabel =
+    metrics.hoursBalanceType === 'gain'
+      ? `+${formatHoursMinutes(Math.abs(metrics.hoursBalance))} (ganho)`
+      : metrics.hoursBalanceType === 'loss'
+        ? `-${formatHoursMinutes(Math.abs(metrics.hoursBalance))} (perda)`
+        : `${formatHoursMinutes(0)} (igual)`;
+  const balanceColor =
+    metrics.hoursBalanceType === 'loss'
+      ? COLORS.red
+      : metrics.hoursBalanceType === 'gain'
+        ? COLORS.green
+        : COLORS.gray500;
+
+  // 6 KPIs em duas linhas (3+3)
+  const kpisRow1 = [
+    {
+      label: 'Total de Chamados',
+      value: metrics.total.toString(),
+      color: COLORS.navy,
+      delta: delta?.deltas.total,
+      deltaInverse: false,
+    },
+    {
+      label: 'Taxa de Resolução',
+      value: `${metrics.closureRate}%`,
+      color: COLORS.green,
+      delta: delta?.deltas.closureRate,
+      deltaInverse: false,
+    },
+    {
+      label: 'Em Aberto',
+      value: (metrics.inProgress + metrics.pending + metrics.newTickets).toString(),
+      color: COLORS.amber,
+      delta: undefined,
+    },
+  ];
+  const kpisRow2 = [
+    {
+      label: 'Média de Horas / Chamado',
+      value: formatHoursMinutes(metrics.avgWorkHours),
+      color: 'FF8B5CF6', // violet
+      delta: undefined,
+    },
+    {
+      label:
+        metrics.hoursBalanceType === 'gain'
+          ? 'Ganho de Horas'
+          : metrics.hoursBalanceType === 'loss'
+            ? 'Perda de Horas'
+            : 'Saldo de Horas',
+      value: balanceLabel,
+      color: balanceColor,
+      delta: undefined,
+    },
+    {
+      label: 'Mix do Período',
+      value: mixHeadline,
+      color: COLORS.navy,
+      delta: undefined,
+    },
   ];
 
-  // Linha dos KPIs
-  const kpiRow = summarySheet.getRow(8);
-  kpiRow.height = 60;
+  /**
+   * Pinta uma linha de 3 KPIs ocupando B-C, D-E e F (com merges) para
+   * ficar visualmente limpo. `delta` opcional aparece como subtitle abaixo.
+   */
+  function paintKpiRow(rowIdx: number, kpis: typeof kpisRow1): void {
+    summarySheet.mergeCells(`B${rowIdx}:C${rowIdx}`);
+    summarySheet.mergeCells(`D${rowIdx}:E${rowIdx}`);
+    // F já é coluna única, sem merge
+    const r = summarySheet.getRow(rowIdx);
+    r.height = 64;
+    const targets: Array<'B' | 'D' | 'F'> = ['B', 'D', 'F'];
+    kpis.forEach((kpi, idx) => {
+      const cell = summarySheet.getCell(`${targets[idx]}${rowIdx}`);
+      const deltaTxt = kpi.delta !== undefined ? formatDeltaCell(kpi.delta) : '';
+      cell.value = deltaTxt
+        ? `${kpi.value}\n${kpi.label}\n${deltaTxt} vs período anterior`
+        : `${kpi.value}\n${kpi.label}`;
+      cell.font = { name: 'Calibri', size: 13, bold: true, color: { argb: COLORS.white } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top: { style: 'thin', color: { argb: COLORS.white } },
+        left: { style: 'thin', color: { argb: COLORS.white } },
+        bottom: { style: 'thin', color: { argb: COLORS.white } },
+        right: { style: 'thin', color: { argb: COLORS.white } },
+      };
+    });
+  }
 
-  kpis.forEach((kpi, index) => {
-    const col = index + 2; // B, C, D, E
-    const cell = kpiRow.getCell(col);
-    cell.value = `${kpi.value}\n${kpi.label}`;
-    cell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: COLORS.white } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: kpi.color } };
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    cell.border = {
-      top: { style: 'thin', color: { argb: COLORS.white } },
-      left: { style: 'thin', color: { argb: COLORS.white } },
-      bottom: { style: 'thin', color: { argb: COLORS.white } },
-      right: { style: 'thin', color: { argb: COLORS.white } },
-    };
-  });
+  // KPIs de produção (linha 8): Total / Taxa / Em Aberto
+  paintKpiRow(8, kpisRow1);
+  // gap visual entre as duas linhas de KPIs
+  summarySheet.getRow(9).height = 8;
+  // KPIs de capacidade (linha 10): Média / Saldo / Mix
+  paintKpiRow(10, kpisRow2);
 
   // Espaço
-  summarySheet.getRow(9).height = 20;
+  summarySheet.getRow(11).height = 18;
 
   // ==========================================
-  // SEÇÃO: DETALHAMENTO
+  // SEÇÃO: DETALHAMENTO POR STATUS
   // ==========================================
-  summarySheet.mergeCells('B10:F10');
-  const detailTitleCell = summarySheet.getCell('B10');
-  detailTitleCell.value = '📋 DETALHAMENTO POR STATUS';
+  summarySheet.mergeCells('B12:F12');
+  const detailTitleCell = summarySheet.getCell('B12');
+  detailTitleCell.value = 'DETALHAMENTO POR STATUS';
   detailTitleCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: COLORS.navy } };
   detailTitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
-  summarySheet.getRow(10).height = 30;
+  summarySheet.getRow(12).height = 30;
 
   // Tabela de status
   const statusData = [
@@ -222,14 +324,15 @@ export async function exportToExcel({
     ['Novo', metrics.newTickets, metrics.total > 0 ? `${((metrics.newTickets / metrics.total) * 100).toFixed(1)}%` : '0%'],
   ];
 
+  const statusStartRow = 14;
   statusData.forEach((row, rowIndex) => {
-    const excelRow = summarySheet.getRow(12 + rowIndex);
+    const excelRow = summarySheet.getRow(statusStartRow + rowIndex);
     excelRow.height = 25;
-    
+
     row.forEach((value, colIndex) => {
       const cell = excelRow.getCell(colIndex + 2); // B, C, D
       cell.value = value;
-      
+
       if (rowIndex === 0) {
         // Header
         cell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: COLORS.white } };
@@ -239,7 +342,7 @@ export async function exportToExcel({
         cell.font = { name: 'Calibri', size: 11, color: { argb: COLORS.navy } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowIndex % 2 === 0 ? COLORS.gray50 : COLORS.white } };
       }
-      
+
       cell.alignment = { horizontal: colIndex === 0 ? 'left' : 'center', vertical: 'middle' };
       cell.border = {
         top: { style: 'thin', color: { argb: COLORS.gray200 } },
@@ -250,23 +353,26 @@ export async function exportToExcel({
     });
   });
 
-  // Totais de horas
-  summarySheet.mergeCells('B19:F19');
-  const hoursTitleCell = summarySheet.getCell('B19');
-  hoursTitleCell.value = 'HORAS APONTADAS';
+  // Totais de horas (detalhamento)
+  const hoursTitleRow = statusStartRow + statusData.length + 1; // 21
+  summarySheet.mergeCells(`B${hoursTitleRow}:F${hoursTitleRow}`);
+  const hoursTitleCell = summarySheet.getCell(`B${hoursTitleRow}`);
+  hoursTitleCell.value = 'HORAS APONTADAS — DETALHAMENTO';
   hoursTitleCell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: COLORS.navy } };
   hoursTitleCell.alignment = { horizontal: 'left', vertical: 'middle' };
+  summarySheet.getRow(hoursTitleRow).height = 24;
 
   const hoursData = [
     ['Planejado', formatHoursMinutes(metrics.totalPlannedHours)],
     ['Realizado', formatHoursMinutes(metrics.totalRealizedHours)],
     ['Saldo Planejado x Realizado', getHoursBalanceLabel(metrics.hoursBalance)],
     ['Legado', formatHoursMinutes(metrics.totalLegacyHours)],
-    ['Pendências', metrics.pendingHoursNotes],
+    ['Pendências de apontamento', metrics.pendingHoursNotes],
   ];
 
   hoursData.forEach((row, rowIndex) => {
-    const excelRow = summarySheet.getRow(21 + rowIndex);
+    const excelRow = summarySheet.getRow(hoursTitleRow + 2 + rowIndex);
+    excelRow.height = 22;
     row.forEach((value, colIndex) => {
       const cell = excelRow.getCell(colIndex + 2);
       cell.value = value;
@@ -281,12 +387,16 @@ export async function exportToExcel({
     });
   });
 
-  // Data de geração
-  summarySheet.mergeCells('B27:F27');
-  const footerCell = summarySheet.getCell('B27');
-  footerCell.value = `Relatório gerado em ${new Date().toLocaleString('pt-BR')} | Central de Monitoramento RPA - Minerva Foods`;
+  // Data de geração (sempre 2 linhas após o último bloco)
+  const footerRow = hoursTitleRow + 2 + hoursData.length + 1;
+  summarySheet.mergeCells(`B${footerRow}:F${footerRow}`);
+  const footerCell = summarySheet.getCell(`B${footerRow}`);
+  footerCell.value =
+    `Relatório gerado em ${new Date().toLocaleString('pt-BR')}  ·  ` +
+    `Indicadores baseados em dados reais do GLPI — sem SLA inventado.`;
   footerCell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: COLORS.gray500 } };
   footerCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  summarySheet.getRow(footerRow).height = 22;
 
   // ==========================================
   // PLANILHA 2: LISTA DE CHAMADOS
@@ -315,7 +425,7 @@ export async function exportToExcel({
   // Título da planilha
   ticketsSheet.mergeCells('A1:L1');
   const ticketsTitleCell = ticketsSheet.getCell('A1');
-  ticketsTitleCell.value = '📋 LISTA COMPLETA DE CHAMADOS';
+  ticketsTitleCell.value = 'LISTA COMPLETA DE CHAMADOS';
   ticketsTitleCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: COLORS.white } };
   ticketsTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: COLORS.navy } };
   ticketsTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
@@ -603,7 +713,10 @@ export async function exportToExcel({
   // PLANILHA 4: POR TÉCNICO
   // ==========================================
   const technicians = getUniqueTechnicians(tickets).filter(Boolean);
-  const techMetrics = technicians.map(t => getTechnicianMetrics(tickets, t));
+  // Ordena por total desc para a aba abrir já com os mais carregados no topo.
+  const techMetrics = technicians
+    .map(t => getTechnicianMetrics(tickets, t))
+    .sort((a, b) => b.total - a.total);
 
   const techSheet = workbook.addWorksheet('Por Técnico', {
     properties: { tabColor: { argb: COLORS.green } },
@@ -935,7 +1048,7 @@ export async function exportToExcel({
   let row = 5;
   insightsSheet.mergeCells(`B${row}:C${row}`);
   const insListTitle = insightsSheet.getCell(`B${row}`);
-  insListTitle.value = '🔍 LEITURA RÁPIDA';
+  insListTitle.value = 'LEITURA RÁPIDA';
   insListTitle.font = { name: 'Calibri', size: 13, bold: true, color: { argb: COLORS.navy } };
   insightsSheet.getRow(row).height = 26;
   row++;
@@ -964,7 +1077,8 @@ export async function exportToExcel({
       toneCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
       const textCell = insightsSheet.getCell(`C${row}`);
-      textCell.value = `${ins.emoji} ${ins.text}`;
+      // Emojis ficam como caixinha em fontes que não os têm — usamos bullet ASCII.
+      textCell.value = `• ${ins.text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\uFE0F]/gu, '').replace(/\s{2,}/g, ' ').trim()}`;
       textCell.font = { name: 'Calibri', size: 11, color: { argb: COLORS.navy } };
       textCell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
       insightsSheet.getRow(row).height = 24;
@@ -975,7 +1089,7 @@ export async function exportToExcel({
   row += 2;
   insightsSheet.mergeCells(`B${row}:C${row}`);
   const actTitle = insightsSheet.getCell(`B${row}`);
-  actTitle.value = '🎯 PRÓXIMAS AÇÕES';
+  actTitle.value = 'PRÓXIMAS AÇÕES';
   actTitle.font = { name: 'Calibri', size: 13, bold: true, color: { argb: COLORS.navy } };
   insightsSheet.getRow(row).height = 26;
   row++;

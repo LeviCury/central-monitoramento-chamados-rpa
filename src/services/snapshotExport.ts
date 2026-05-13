@@ -30,12 +30,29 @@ interface CaptureOptions {
   scale?: number;
 }
 
+/**
+ * Detecta o tema atual do app pelo `data-theme` aplicado ao <html>.
+ * Sem o parâmetro, snapshot pegaria fundo errado (vazia → preto).
+ */
+function detectThemeBackground(): string {
+  if (typeof document === 'undefined') return '#fafafa';
+  const root = document.documentElement;
+  const dataTheme = root.getAttribute('data-theme');
+  const isDark =
+    dataTheme === 'dark' ||
+    root.classList.contains('dark') ||
+    (dataTheme !== 'light' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+  return isDark ? '#09090b' : '#fafafa';
+}
+
 async function captureCanvas(
   element: HTMLElement,
   options: CaptureOptions = {}
 ): Promise<HTMLCanvasElement> {
   return html2canvas(element, {
-    backgroundColor: options.backgroundColor ?? '#0F172A',
+    backgroundColor: options.backgroundColor ?? detectThemeBackground(),
     scale: options.scale ?? 3,
     useCORS: true,
     logging: false,
@@ -370,6 +387,17 @@ function drawSimplePageHeader(pdf: jsPDF, title: string): void {
 }
 
 function drawFooter(pdf: jsPDF, page: number, total: number): void {
+  // Frase de princípio do projeto (acima do divisor)
+  setColor(pdf, BRAND.muted);
+  pdf.setFont('helvetica', 'italic');
+  pdf.setFontSize(6.8);
+  pdf.text(
+    'Indicadores baseados em dados reais do GLPI — sem SLA inventado.',
+    PAGE.w / 2,
+    FOOTER_Y - 5,
+    { align: 'center' }
+  );
+
   setDraw(pdf, BRAND.divider);
   pdf.setLineWidth(0.2);
   pdf.line(PAGE.margin, FOOTER_Y - 3, PAGE.w - PAGE.margin, FOOTER_Y - 3);
@@ -990,7 +1018,8 @@ function drawTypeBreakdownSection(
 function drawTechnicianBreakdown(
   pdf: jsPDF,
   y: number,
-  data: Array<{ technician: string; count: number }>
+  data: Array<{ technician: string; count: number }>,
+  totalAll: number
 ): number {
   const top = data.slice(0, 5);
   if (top.length === 0) return y;
@@ -1010,6 +1039,7 @@ function drawTechnicianBreakdown(
   ];
   top.forEach((row, idx) => {
     const pct = (row.count / Math.max(1, max)) * 100;
+    const pctOfTotal = totalAll > 0 ? (row.count / totalAll) * 100 : 0;
     drawHorizontalBar(
       pdf,
       x,
@@ -1019,7 +1049,7 @@ function drawTechnicianBreakdown(
       pct,
       palette[idx % palette.length],
       `${idx + 1}. ${row.technician}`,
-      row.count.toLocaleString('pt-BR')
+      `${row.count.toLocaleString('pt-BR')}  ·  ${pctOfTotal.toFixed(1)}%`
     );
     cursor += rowGap;
   });
@@ -1169,7 +1199,7 @@ export async function downloadExecutiveSummaryPdf(input: ExecutiveSummaryInput):
       y = 22;
     }
     y = drawSectionTitle(pdf, y, 'Top 5 Técnicos', BRAND.red);
-    y = drawTechnicianBreakdown(pdf, y, input.technicianBreakdown);
+    y = drawTechnicianBreakdown(pdf, y, input.technicianBreakdown, input.metrics.total);
   }
 
   // ============== PÁGINA 2: Insights + Ações ==============
@@ -1326,7 +1356,14 @@ function buildKpiCards(input: ExecutiveSummaryInput): KpiCard[] {
           : m.hoursBalanceType === 'loss'
             ? 'Perda de Horas'
             : 'Saldo de Horas',
-      value: `${Math.abs(m.hoursBalance).toFixed(1)}h`,
+      // Sinal explícito (+/−) para reforçar leitura instantânea da direção.
+      value: `${
+        m.hoursBalanceType === 'gain'
+          ? '+'
+          : m.hoursBalanceType === 'loss'
+            ? '-'
+            : ''
+      }${Math.abs(m.hoursBalance).toFixed(1)}h`,
       subtitle:
         m.hoursBalanceType === 'gain'
           ? 'Horas economizadas vs planejado'
