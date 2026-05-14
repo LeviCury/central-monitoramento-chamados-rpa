@@ -237,6 +237,7 @@ font-variant-numeric: tabular-nums
 | **Bordas dos cards** | `lit-border` rotativo no hover (efeito RGB)            | `ring-1 ring-black/6` estático, refinado          |
 | **Toaster**          | Fundo tonal forte + ícone `9×9` colorido               | Glass-strong neutro + ícone `7×7` discreto        |
 | **Tabela**           | Header navy gradient, badges com `border + bg-50`      | Header neutro com glass sticky, badges sem borda  |
+| **Filtros tabela**   | Apenas search global                                   | Popover Excel-style por coluna (Tipo/Status/Téc.) |
 | **Filtros**          | Caixas com borda visível, accent colorido por seção    | Divisores `border-b` sutis, monocromático         |
 | **Drawer**           | Header navy gradient + glow no botão fechar            | Glass-strong neutro, botão fechar ghost           |
 
@@ -311,10 +312,25 @@ ou tocando projeto (requisições dominam) — com mini-barra segmentada e headl
 
 Logo abaixo dos KPIs aparece o bloco de leitura do dia:
 
-- **Leitura rápida** — 3–5 frases curtas geradas a partir das métricas
+- **Leitura rápida** — frases curtas geradas a partir das métricas e dos chamados individuais
   *("Taxa de resolução em alta: +12% em 7 dias")*
 - **Próximas ações** — lista priorizada com botões "Filtrar →" que aplicam o filtro relevante
   *("3 chamados parados há mais de 7 dias — Filtrar")*
+
+#### Regras dos insights "Crítico" e "Atenção"
+
+A leitura é *ticket-aware*: percorre cada chamado individualmente em vez de adivinhar pelas
+agregações. Só dispara quando há motivo real:
+
+| Severidade   | Quando aparece                                                                       |
+| ------------ | ------------------------------------------------------------------------------------ |
+| 🔴 **Crítico**  | Existe pelo menos 1 **incidente** em status **Novo**, **sem técnico atribuído**, aberto há **mais de 1 dia**. |
+| 🟠 **Atenção**  | Existe pelo menos 1 **requisição** em status **Novo**, **sem técnico atribuído**, aberta há **mais de 7 dias**. |
+
+> [!NOTE]
+> Se nenhum chamado se enquadrar, o insight é **omitido** — a leitura nunca polui o painel
+> só pra preencher espaço. Insights baseados em apontamento de horas (perda) também foram
+> retirados; a leitura mantém só o ganho positivo de horas, quando aplicável.
 
 ### Gráficos com drill-down
 
@@ -357,6 +373,10 @@ Selecione **até 4 técnicos** e veja lado a lado, com mini-barras proporcionais
 
 - **Sort clicável** por qualquer coluna (ID, título, status, técnico, horas, data)
 - **Busca** em tempo real (ID, título, técnico)
+- **Filtro estilo Excel** nas colunas **Tipo**, **Status** e **Técnico** — popover com checkbox
+  multi-seleção, mini-busca interna, "Selecionar todos" / "Limpar". Escopo **só da lista**:
+  não vaza pros KPIs, gráficos ou exports. Indicador visual no header quando ativo (dot
+  vermelho Minerva) + link "limpar filtros (N)" no subtítulo
 - **Density toggle** (Confortável ↔ Compacto) com persistência visual
 - **Paginação pill** Apple-style
 - **Stripe colorido** lateral aparece no hover, refletindo o status
@@ -688,6 +708,33 @@ A sessão é cacheada em memória e renovada automaticamente em respostas `401`.
 > do `range` (`0-2000`, ou seja, 2001 itens). Sintoma típico: o número total fica exatamente
 > 2001 mesmo quando a sua fila tem muito menos.
 
+### Estratégia de busca por status (multi-request)
+
+A busca de tickets é feita em **N requisições paralelas, uma por status**, em vez de uma
+única chamada com filtro `OR`. Isso resolve dois problemas reais do GLPI:
+
+1. **Precedência `AND`/`OR`** — combinar `OR` de status com `AND` de grupo fazia o GLPI
+   ignorar o filtro de grupo e devolver chamados de outras filas. Forçando só `AND`,
+   o filtro fica respeitado.
+2. **Chamados em aberto sempre visíveis dentro do recorte de data** — o filtro de período
+   (`start` → `end`) só se aplica a chamados **finalizados**. Chamados ainda **em aberto**
+   (Novo · Em Atendimento · Pendente) **vêm sempre**, independente da data de abertura.
+   Assim, um incidente aberto há 60 dias e ainda sem solução continua aparecendo no recorte
+   "últimos 7 dias" — porque é exatamente aí que ele precisa ser visto.
+
+### Categorias excluídas
+
+Categorias técnicas (campo `7`) listadas em `EXCLUDED_CATEGORY_TOKENS` (em
+`src/services/glpi/constants.ts`) **nunca entram** no painel — são removidas no client após
+a busca. Por padrão exclui `Novo RPA` (são *projetos*, não chamados de atendimento). Edite o
+arquivo se quiser adicionar outras categorias.
+
+### Whitelist de colaboradores RPA
+
+A constante `DEFAULT_RPA_COLLABORATORS` em `src/config.ts` define quem é "do time" — só esses
+nomes aparecem no comparador, no ranking e no `Planejado vs Realizado`. A `VITE_RPA_COLLABORATORS`
+do `.env` é tratada como **adição**, não substituição: o time RPA core já vem hardcoded.
+
 ### Proxy de desenvolvimento
 
 `vite.config.ts` faz proxy de `/api/glpi/*` para `https://central.minervafoods.com/apirest.php`
@@ -723,39 +770,50 @@ demanda (`html2canvas`, `jspdf`, `exceljs`).
 ### Resumo Executivo (PDF) — anatomia
 
 Pensado para enviar a diretores/gerentes ou imprimir. Identidade visual Minerva, sem
-screenshot — **tudo desenhado dos dados**.
+screenshot — **tudo desenhado dos dados**, com layout estilo *magazine editorial*: tipografia
+mista, hairlines duplas, cards com acento lateral grosso, paleta saturada e cobertura
+milimétrica de cada espaço. Concentrado em **3 páginas densas e impactantes** — sem páginas
+soltas, sem linhas órfãs.
 
-**Página 1 — Visão geral**
+**Página 1 — Capa & Síntese**
 
-- **Header**: ribbon Minerva red + bloco navy com eyebrow `MINERVA FOODS · DOCUMENTO INTERNO`,
-  título "Resumo Executivo" e bloco direito com `PERÍODO` e `GERADO EM`
-- **Hero**: bloco navy escuro com:
-  - Total de chamados em destaque
-  - Delta vs período anterior (`+X%` em verde / `-X%` em vermelho — **sem setas unicode**, só
-    ASCII puro pra renderizar igual em qualquer fonte)
-  - 3 pílulas: `em aberto` · `finalizados` · `resolução %`
-- **Faixa didática** logo abaixo do hero explicando como ler as variações em %
-- **6 KPIs** (3×2) com borda lateral colorida, título small caps e valor grande
-- **Distribuição por Status**: barras horizontais coloridas com `count · %`
-- **Por Tipo de Chamado**: 2 colunas (Incidentes vermelho · Requisições azul) com total,
-  `% do total`, em aberto, parados e taxa de resolução
-- **Top 5 Técnicos**: barras horizontais com paleta variada
+- **Capa institucional**: tagline `Tecnologia · Automação · RPA`, título principal "Central
+  de Monitoramento de Chamados", bloco com período + emitido em, branding Minerva discreto
+- **Síntese executiva**: hero com total de chamados + Δ% vs período anterior, citação
+  narrativa do período (texto curto contextualizando)
+- **Em Aberto** — row de 4 cards independentes saturados: `Total Abertos` · `Novo` ·
+  `Em atendimento` · `Pendente` (este último sólido charcoal com texto branco — destaque
+  pra "fora da nossa mão")
+- **Resultado** — row de 2 cards: `Finalizados` + `Taxa de resolução`
+- **Horas** — row de 3 cards: planejado · realizado · saldo (verde = ganho · vermelho = déficit)
 
-**Página 2 — Análise**
+**Página 2 — Operação visual**
 
-- Header navy simplificado
-- `LEITURA RÁPIDA`: insights em cards tonais (verde/âmbar/vermelho/cinza)
-- `PRÓXIMAS AÇÕES`: cards com painel lateral colorido `ALTA`/`MÉDIA`/`BAIXA`, contagem em
-  destaque, título e descrição
+- `01 Distribuição por Status`: barras horizontais com count + %
+- `02 Por Tipo de Chamado`: 2 colunas (Incidentes · Requisições) com mix completo
+- `03 Top Técnicos por Volume`: ranking horizontal com paleta variada
 
-**Footer (todas as páginas)**
+**Página 3 — Leitura executiva**
 
-- Linha divisora + `Central de Monitoramento RPA · Minerva Foods` + `Página X / Y`
+- `04 Leitura executiva`: insights em cards compactos tonais — só dispara quando há motivo
+  real (ver [regras Crítico/Atenção](#regras-dos-insights-crítico-e-atenção))
+
+**Header e footer (todas as páginas)**
+
+- Header com numeração + caption descritiva e hair-line dupla
+- Footer institucional editorial com `Central de Monitoramento RPA · Minerva Foods` +
+  paginação `Página X / Y`
 
 > [!NOTE]
-> Versões anteriores usavam `▲`/`▼` para os deltas, mas o Helvetica embutido no jsPDF não tem
-> esses glifos e renderizava lixo (`%²`, `%¼`). Trocamos por `+` e `-` ASCII; cor + sinal já
-> comunicam direção.
+> Versões anteriores usavam `▲`/`▼` para os deltas e `±` para o saldo, mas o Helvetica embutido
+> no jsPDF não tem esses glifos e renderizava lixo (`%²`, `%¼`). Trocamos por `+`/`-`/`+/-`
+> ASCII puro; cor + sinal já comunicam direção. Larguras de texto agora são medidas com
+> `measureText` (incluindo `charSpace`), eliminando overflow em capa, hero, cards e legendas.
+
+> [!IMPORTANT]
+> A seção **"Ações prioritárias"** foi **removida do PDF**. O leitor executivo prefere ver a
+> leitura crua dos números do que uma lista de TODOs sintetizada — esses ficam no painel,
+> ao alcance do clique, com o botão `Filtrar →`.
 
 ### Excel — abas geradas
 
