@@ -34,6 +34,7 @@ export const fetchTickets = async (params: FetchTicketsParams): Promise<Ticket[]
 
   const effectiveGroupId = params.groupId || config.glpi.defaultGroupId;
   const effectiveEntityId = config.glpi.entityId ?? undefined;
+  const hasDateFilter = !!(params.startDate || params.endDate);
   if (config.isDev) {
     console.info(
       `[GLPI] Buscando chamados — grupo=${effectiveGroupId}` +
@@ -41,6 +42,13 @@ export const fetchTickets = async (params: FetchTicketsParams): Promise<Ticket[]
         (params.startDate ? ` · de ${params.startDate}` : '') +
         (params.endDate ? ` até ${params.endDate}` : '')
     );
+    if (hasDateFilter) {
+      console.info(
+        '[GLPI] Regra de janela de data: TODOS os chamados em aberto são incluídos ' +
+          '(independente da data); o filtro só restringe os FINALIZADOS — usando ' +
+          'solvedate (campo 17) para saber quando foram resolvidos.'
+      );
+    }
   }
 
   const tickets = await fetchTicketsFromGLPI({
@@ -747,9 +755,37 @@ export interface ActionItem {
 
 const formatPercent = (value: number) => `${value > 0 ? '+' : ''}${value}%`;
 
+/**
+ * Critérios para "Crítico" e "Atenção" são ticket-aware (não derivam só
+ * dos metrics agregados):
+ *
+ *   CRÍTICO  =  incidente em status "Novo", SEM técnico atribuído,
+ *               aberto há mais de 1 dia.
+ *   ATENÇÃO  =  requisição em status "Novo", SEM técnico atribuído,
+ *               aberta há mais de 7 dias.
+ *
+ * Quando não houver chamados se enquadrando, o insight é OMITIDO
+ * (não aparece como "saudável" — silêncio é a sinalização).
+ *
+ * Insights sobre apontamento de horas (planejado/realizado em branco)
+ * foram removidos do resumo executivo a pedido do usuário. O insight
+ * de "ganho de horas vs planejado" permanece — mas só quando é GANHO
+ * (variante "perda" foi removida porque vira atenção sobre horas).
+ */
+const isUnassignedTechnician = (t: Ticket): boolean =>
+  !t.assigned_technician || t.assigned_technician === 'Não atribuído';
+
+const daysSinceOpen = (t: Ticket): number => {
+  if (!t.opened_date) return 0;
+  const opened = new Date(t.opened_date).getTime();
+  if (!Number.isFinite(opened)) return 0;
+  return (Date.now() - opened) / 86_400_000;
+};
+
 export const generateInsights = (
   metrics: TicketMetrics,
-  delta: MetricsDelta
+  delta: MetricsDelta,
+  tickets: Ticket[] = []
 ): Insight[] => {
   const out: Insight[] = [];
 
@@ -779,43 +815,53 @@ export const generateInsights = (
     });
   }
 
-  if (metrics.staleCount > 0) {
-    const plural = metrics.staleCount === 1 ? '' : 's';
+  // CRÍTICO: incidentes "Novo" sem técnico, abertos há > 1 dia
+  const criticalIncidents = tickets.filter(
+    t =>
+      t.type === 'incident' &&
+      t.status === 'Novo' &&
+      isUnassignedTechnician(t) &&
+      daysSinceOpen(t) > 1
+  );
+  if (criticalIncidents.length > 0) {
+    const n = criticalIncidents.length;
+    const plural = n === 1 ? '' : 's';
     out.push({
-      id: 'stale',
+      id: 'critical-incidents-unassigned',
       tone: 'bad',
-      emoji: '⏰',
-      text: `${metrics.staleCount} chamado${plural} aberto${plural} há mais de ${metrics.staleThresholdDays} dias (limite definido para o time). Média atual de ${metrics.avgDaysOpen.toFixed(1)} dias em aberto — vale revisar prioridade ou fechamento.`,
-    });
-  } else if (metrics.open > 0) {
-    out.push({
-      id: 'stale',
-      tone: 'good',
-      emoji: '✅',
-      text: `Nenhum chamado aberto acima do limite de ${metrics.staleThresholdDays} dias — backlog saudável.`,
+      emoji: '!',
+      text: `${n} incidente${plural} novo${plural} sem atribuição há mais de 1 dia — risco de impacto operacional, priorizar triagem.`,
     });
   }
 
-  if (metrics.hoursBalanceType !== 'neutral' && metrics.totalRealizedHours > 0) {
-    const isLoss = metrics.hoursBalanceType === 'loss';
+  // ATENÇÃO: requisições "Novo" sem técnico, abertas há > 7 dias
+  const attentionRequests = tickets.filter(
+    t =>
+      t.type === 'request' &&
+      t.status === 'Novo' &&
+      isUnassignedTechnician(t) &&
+      daysSinceOpen(t) > 7
+  );
+  if (attentionRequests.length > 0) {
+    const n = attentionRequests.length;
+    const plural = n === 1 ? '' : 'ões';
+    const novaPlural = n === 1 ? 'nova' : 'novas';
+    out.push({
+      id: 'attention-requests-unassigned',
+      tone: 'warn',
+      emoji: '~',
+      text: `${n} requisiç${plural === 'ões' ? plural : 'ão'} ${novaPlural} sem atribuição há mais de 7 dias — vale revisar fila de triagem.`,
+    });
+  }
+
+  // Ganho de horas vs planejado — só quando É ganho (variante "perda" removida)
+  if (metrics.hoursBalanceType === 'gain' && metrics.totalRealizedHours > 0) {
     const balance = formatHoursMinutes(Math.abs(metrics.hoursBalance));
     out.push({
-      id: 'hours',
-      tone: isLoss ? 'warn' : 'good',
-      emoji: isLoss ? '⏱' : '🎯',
-      text: isLoss
-        ? `Horas realizadas excedem o planejado em ${balance} — chamados estão consumindo mais esforço do que o estimado; vale revisar planejamento.`
-        : `Ganho de ${balance} vs planejado — o time entregou em menos tempo do que havia estimado, indicando boa estimativa ou produtividade acima do plano.`,
-    });
-  }
-
-  if (metrics.pendingHoursNotes > 0) {
-    const plural = metrics.pendingHoursNotes === 1 ? '' : 's';
-    out.push({
-      id: 'hours-notes',
-      tone: 'warn',
-      emoji: '📝',
-      text: `${metrics.pendingHoursNotes} chamado${plural} sem apontamento completo de horas (planejado e/ou realizado em branco) — ficam fora dos cálculos de eficiência até serem preenchidos.`,
+      id: 'hours-gain',
+      tone: 'good',
+      emoji: '🎯',
+      text: `Ganho de ${balance} vs planejado — o time entregou em menos tempo do que havia estimado, indicando boa estimativa ou produtividade acima do plano.`,
     });
   }
 

@@ -119,7 +119,7 @@ export default function Dashboard() {
     [metrics, previousMetrics]
   );
 
-  const insights = useMemo(() => generateInsights(metrics, delta), [metrics, delta]);
+  const insights = useMemo(() => generateInsights(metrics, delta, tickets), [metrics, delta, tickets]);
   const actionItems = useMemo(() => generateActionItems(tickets, metrics), [tickets, metrics]);
 
   const handleApplyAction = (item: ActionItem) => {
