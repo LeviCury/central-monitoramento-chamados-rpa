@@ -14,6 +14,9 @@ import {
   STATUS_NAME_TO_ID,
   PRIORITY_NAME_TO_ID,
   TYPE_MAP,
+  OPEN_STATUS_IDS,
+  CLOSED_STATUS_IDS,
+  EXCLUDED_CATEGORY_TOKENS,
 } from './constants';
 import {
   glpiSearchResponseSchema,
@@ -32,6 +35,28 @@ export interface GLPISearchParams {
   technicians?: string[];
   range?: string;
   signal?: AbortSignal;
+}
+
+/**
+ * Variante interna de `GLPISearchParams` usada pela `fetchTicketsRaw`. Permite
+ * que o orquestrador (`fetchTicketsFromGLPI`) injete:
+ *
+ * - `_statusId`: UM único ID de status (singular, não array). Por quê? Porque
+ *   a API search do GLPI processa criteria de forma "plana" (sem parênteses):
+ *   se enviarmos `AND status=1 OR status=2 OR status=3`, a precedência SQL
+ *   transforma em `(... AND status=1) OR status=2 OR status=3` — e os
+ *   filtros de grupo/entidade ficam aplicados SÓ ao primeiro status, fazendo
+ *   o sistema retornar chamados de filas erradas. A solução é disparar UMA
+ *   request por status, com tudo AND simples, e fazer dedupe no orquestrador.
+ * - `_dateField`: qual campo do GLPI usar no filtro de data. Default é
+ *   `DATE_MOD` (legado); a request "finalizados no período" usa `DATE_SOLVED`.
+ *
+ * Esses campos são internos e não fazem parte da API pública porque são
+ * detalhes da estratégia de split (ver doc de `fetchTicketsFromGLPI`).
+ */
+interface GLPISearchParamsInternal extends GLPISearchParams {
+  _statusId?: number;
+  _dateField?: number;
 }
 
 /**
@@ -69,7 +94,7 @@ function resolveEntityValue(
   return entityValueRaw;
 }
 
-function buildSearchCriteria(params: GLPISearchParams): object[] {
+function buildSearchCriteria(params: GLPISearchParamsInternal): object[] {
   const criteria: object[] = [];
 
   const entityValueRaw = params.entityId || config.glpi.entityId;
@@ -101,10 +126,17 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
     });
   }
 
+  // Campo do GLPI usado para filtrar a janela de data. O default `DATE_MOD`
+  // (campo 19 = última atualização) preserva o comportamento legado para
+  // chamadas sem `_dateField`. O orquestrador `fetchTicketsFromGLPI` usa
+  // `DATE_SOLVED` (campo 17) na request de finalizados, porque o que importa
+  // ali é "quando o chamado foi resolvido", não quando teve qualquer mexida.
+  const dateField = params._dateField ?? GLPI_FIELDS.DATE_MOD;
+
   if (params.startDate) {
     criteria.push({
       link: 'AND',
-      field: GLPI_FIELDS.DATE_MOD,
+      field: dateField,
       searchtype: 'morethan',
       value: `${params.startDate} 00:00:00`,
     });
@@ -113,13 +145,27 @@ function buildSearchCriteria(params: GLPISearchParams): object[] {
   if (params.endDate) {
     criteria.push({
       link: 'AND',
-      field: GLPI_FIELDS.DATE_MOD,
+      field: dateField,
       searchtype: 'lessthan',
       value: `${params.endDate} 23:59:59`,
     });
   }
 
-  if (params.statuses && params.statuses.length > 0) {
+  // Status: prioriza ID explícito singular (`_statusId`). É o formato usado
+  // pelo orquestrador, que dispara UMA request por status — tudo AND, sem
+  // OR ambíguo. Cai pra `statuses` (nomes) na chamada legada sem orquestração.
+  if (typeof params._statusId === 'number') {
+    criteria.push({
+      link: 'AND',
+      field: GLPI_FIELDS.STATUS,
+      searchtype: 'equals',
+      value: params._statusId,
+    });
+  } else if (params.statuses && params.statuses.length > 0) {
+    // ATENÇÃO: este bloco gera múltiplos critérios AND/OR e tem o mesmo
+    // problema de precedência descrito em `_statusId`. Só é alcançado pelo
+    // atalho legado (sem filtro de data E sem split). O orquestrador
+    // garante que múltiplos status sejam disparados como N requests.
     params.statuses.forEach((status, index) => {
       const statusId = STATUS_NAME_TO_ID[status];
       criteria.push({
@@ -243,7 +289,186 @@ function parseGLPITicket(raw: GlpiTicketRaw): Ticket {
   };
 }
 
+/**
+ * Calcula a interseção entre os status pedidos pelo usuário (por nome) e
+ * uma "bucket" pré-definida de IDs (abertos ou finalizados). Retorna:
+ *
+ * - `null` se o usuário não pediu status nenhum → usar a bucket inteira
+ *   (sem restrição extra).
+ * - Lista de IDs do bucket que estavam entre os pedidos pelo usuário
+ *   (pode ser vazia → essa request nem precisa rodar).
+ *
+ * Tolera nomes que não estão no map (ignora silenciosamente — coerente
+ * com o comportamento legado de `buildSearchCriteria`).
+ */
+function intersectRequestedStatuses(
+  requestedNames: string[] | undefined,
+  bucket: readonly number[]
+): number[] | null {
+  if (!requestedNames || requestedNames.length === 0) {
+    // Sem restrição → usar a bucket inteira (mas como `null` para sinalizar
+    // "sem filtro de status do usuário"; o caller decide).
+    return null;
+  }
+  const requestedIds = new Set(
+    requestedNames
+      .map(name => STATUS_NAME_TO_ID[name])
+      .filter((id): id is number => typeof id === 'number')
+  );
+  return bucket.filter(id => requestedIds.has(id));
+}
+
+/** Deduplicação por id, preservando o primeiro a chegar (ordem da lista). */
+function dedupeById(tickets: Ticket[]): Ticket[] {
+  const seen = new Set<string>();
+  const out: Ticket[] = [];
+  for (const t of tickets) {
+    if (seen.has(t.id)) continue;
+    seen.add(t.id);
+    out.push(t);
+  }
+  return out;
+}
+
+/**
+ * Verifica se a categoria de um ticket bate em algum token excluído
+ * (case-insensitive, por substring). Centralizado pra ficar fácil testar
+ * mentalmente: se quiser excluir mais categorias, edite o array em
+ * `EXCLUDED_CATEGORY_TOKENS` em `constants.ts`.
+ */
+function isCategoryExcluded(category: string): boolean {
+  if (!category) return false;
+  const normalized = category.toLowerCase();
+  for (const token of EXCLUDED_CATEGORY_TOKENS) {
+    if (normalized.includes(token.toLowerCase())) return true;
+  }
+  return false;
+}
+
+/**
+ * "Plano" de uma das N requests do split: qual status, se aplica filtro
+ * de data, e qual campo de data usar.
+ */
+interface StatusFetchPlan {
+  statusId: number;
+  applyDate: boolean;
+  dateField: number;
+}
+
+/**
+ * Fetcher PÚBLICO de tickets. Implementa a regra de produto:
+ *
+ *   "Se está aberto, aparece. O filtro de data só decide quais
+ *    finalizados aparecem."
+ *
+ * IMPORTANTE — Por que N requests em vez de 1?
+ *
+ * A API search do GLPI processa criteria de forma PLANA (sem parênteses).
+ * Múltiplos status com OR (ex.: `AND grupo=108 AND status=1 OR status=2 ...`)
+ * sofrem precedência tipo SQL e viram `(grupo=108 AND status=1) OR status=2`,
+ * o que vaza chamados de OUTRAS filas. A solução robusta é disparar UMA
+ * request por status, com tudo AND simples, e fazer dedupe no fim.
+ *
+ * Atalho de performance: se NÃO há filtro de data E NÃO há statuses pedidos
+ * pelo usuário → 1 request única sem critério de status (legado, igual antes).
+ *
+ * Caso geral:
+ *   - Sem filtro de data: 1 request por status pedido (ou TODOS, se vazio).
+ *   - Com filtro de data:
+ *       - 1 request por status ABERTO, SEM filtro de data ("abertos sagrados").
+ *       - 1 request por status FINALIZADO, com filtro por DATE_SOLVED.
+ *   - Os resultados das N requests são unidos e deduplicados por id.
+ */
 export async function fetchTicketsFromGLPI(params: GLPISearchParams): Promise<Ticket[]> {
+  const hasDateFilter = !!(params.startDate || params.endDate);
+  const userPickedStatuses = (params.statuses?.length ?? 0) > 0;
+
+  // Atalho legado: sem filtro de data E sem statuses do usuário → 1 request,
+  // sem critério de status, igual ao comportamento de antes da refatoração.
+  if (!hasDateFilter && !userPickedStatuses) {
+    return fetchTicketsRaw(params);
+  }
+
+  const plan = buildStatusFetchPlan(params, hasDateFilter);
+
+  if (plan.length === 0) {
+    // Edge case: usuário pediu status que não está em nenhuma bucket.
+    return [];
+  }
+
+  if (config.isDev) {
+    console.info(
+      `[GLPI] Disparando ${plan.length} request(s) em paralelo ` +
+        `(uma por status) para evitar bug de precedência OR/AND no GLPI search.`
+    );
+  }
+
+  const tasks = plan.map(p =>
+    fetchTicketsRaw({
+      ...params,
+      statuses: undefined,                                  // resolvido via _statusId
+      startDate: p.applyDate ? params.startDate : undefined,
+      endDate: p.applyDate ? params.endDate : undefined,
+      _statusId: p.statusId,
+      _dateField: p.dateField,
+    })
+  );
+
+  const lists = await Promise.all(tasks);
+  return dedupeById(lists.flat());
+}
+
+/**
+ * Monta o plano de N requests a partir dos parâmetros do usuário.
+ *
+ * Regras:
+ *   - Status ABERTOS (1-4): NUNCA recebem filtro de data (regra de produto:
+ *     "se está aberto, aparece").
+ *   - Status FINALIZADOS (5-6): recebem filtro de data SE houver, usando
+ *     `DATE_SOLVED` (campo 17, "quando foi solucionado") em vez de `DATE_MOD`.
+ *   - Se o usuário escolheu status manualmente, intersectamos com cada bucket;
+ *     senão, usamos a bucket inteira.
+ */
+function buildStatusFetchPlan(
+  params: GLPISearchParams,
+  hasDateFilter: boolean
+): StatusFetchPlan[] {
+  const plan: StatusFetchPlan[] = [];
+
+  const openIds = intersectRequestedStatuses(params.statuses, OPEN_STATUS_IDS);
+  const closedIds = intersectRequestedStatuses(params.statuses, CLOSED_STATUS_IDS);
+
+  // `null` = usuário não restringiu status → usar bucket inteira.
+  const openBucket = openIds === null ? [...OPEN_STATUS_IDS] : openIds;
+  const closedBucket = closedIds === null ? [...CLOSED_STATUS_IDS] : closedIds;
+
+  for (const statusId of openBucket) {
+    plan.push({
+      statusId,
+      applyDate: false,                       // abertos ignoram data
+      dateField: GLPI_FIELDS.DATE_MOD,        // irrelevante (applyDate=false)
+    });
+  }
+
+  for (const statusId of closedBucket) {
+    plan.push({
+      statusId,
+      applyDate: hasDateFilter,
+      dateField: GLPI_FIELDS.DATE_SOLVED,     // "quando foi solucionado"
+    });
+  }
+
+  return plan;
+}
+
+/**
+ * Fetcher RAW: faz uma única request em /search/Ticket com os critérios
+ * passados. É a versão "low-level" que preserva 100% o comportamento
+ * legado da antiga `fetchTicketsFromGLPI`. Hoje é usada por:
+ *   - `fetchTicketsFromGLPI` (fluxo público sem filtro de data)
+ *   - `fetchTicketsFromGLPI` (cada uma das 2 requests do split)
+ */
+async function fetchTicketsRaw(params: GLPISearchParamsInternal): Promise<Ticket[]> {
   const criteria = buildSearchCriteria(params);
 
   const requestBody = {
@@ -311,7 +536,21 @@ export async function fetchTicketsFromGLPI(params: GLPISearchParams): Promise<Ti
     console.log(`[GLPI] ${list.length} tickets encontrados`);
   }
 
-  const parsedTickets = list.map(parseGLPITicket);
+  const allParsedTickets = list.map(parseGLPITicket);
+
+  // Filtra categorias excluídas (ex.: "RPA > Novo RPA" são PROJETOS, não
+  // chamados de atendimento — não devem aparecer em nenhum lugar do app).
+  // Aplicado ANTES do enriquecimento de nomes pra economizar requests
+  // de usuário desnecessárias.
+  const parsedTickets = allParsedTickets.filter(t => !isCategoryExcluded(t.tags));
+  const excludedCount = allParsedTickets.length - parsedTickets.length;
+  if (excludedCount > 0) {
+    console.info(
+      `[GLPI] ${excludedCount} chamado(s) descartado(s) por categoria excluída ` +
+        `(${EXCLUDED_CATEGORY_TOKENS.join(', ')}). ` +
+        `${parsedTickets.length} restante(s) entram no painel.`
+    );
+  }
 
   // Resolve nomes de técnico/solicitante.
   try {

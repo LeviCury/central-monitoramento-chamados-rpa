@@ -46,6 +46,39 @@ export const STATUS_MAP: Record<number, string> = {
   6: 'Fechado',
 };
 
+/**
+ * IDs dos status considerados "em aberto" (chamado vivo na fila).
+ * Usado pelo split de requests no `fetchTicketsFromGLPI`: chamados nesses
+ * status são SEMPRE retornados, independente do filtro de data — porque
+ * "se está aberto, aparece" (regra do produto).
+ */
+export const OPEN_STATUS_IDS = [1, 2, 3, 4] as const;
+
+/**
+ * IDs dos status considerados "finalizados" (solucionado/fechado).
+ * O filtro de data SÓ se aplica a estes — usando `solvedate` (campo 17)
+ * em vez de `date_mod` (campo 19), porque queremos saber em que período
+ * o chamado foi efetivamente resolvido.
+ */
+export const CLOSED_STATUS_IDS = [5, 6] as const;
+
+/**
+ * Tokens (case-insensitive) que, se encontrados no caminho de categoria
+ * do chamado, causam EXCLUSÃO total: o chamado nem entra no sistema —
+ * não conta em KPI, não aparece em tabela, não vai pra exports.
+ *
+ * Motivação (Minerva): chamados em "RPA > Novo RPA" são PROJETOS de
+ * automação, não atendimento operacional. O dashboard é exclusivamente
+ * para a fila de atendimento.
+ *
+ * O filtro é aplicado em `fetchTicketsRaw` (logo após o GLPI responder,
+ * antes do enriquecimento de nomes) por substring case-insensitive, pra
+ * pegar tanto "RPA > Novo RPA" quanto qualquer subcategoria abaixo dele.
+ *
+ * Adicione novos tokens aqui se outras categorias precisarem ser ignoradas.
+ */
+export const EXCLUDED_CATEGORY_TOKENS: readonly string[] = ['Novo RPA'];
+
 export const PRIORITY_MAP: Record<number, string> = {
   1: 'Muito Baixa',
   2: 'Baixa',

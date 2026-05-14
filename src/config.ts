@@ -19,8 +19,65 @@ export interface GlpiGroup {
   name: string;
 }
 
+/**
+ * Equipe RPA da Minerva — lista FIXA, hardcoded no código.
+ *
+ * Por que hardcoded em vez de depender 100% de `VITE_RPA_COLLABORATORS`?
+ *   1. A equipe é estável e pequena (6 pessoas em maio/2026).
+ *   2. Garante que em QUALQUER ambiente (dev local, Vercel, alguém clonando
+ *      o repo amanhã) o painel vai filtrar corretamente — sem o silêncio
+ *      desconcertante de "ué, apareceu CST_Luiz aqui no apontamento de
+ *      horas, alguém da equipe RPA?".
+ *   3. A env var continua suportada e tem PRECEDÊNCIA (ver `parseCollaborators`):
+ *      basta definir `VITE_RPA_COLLABORATORS="A|B|C"` para sobrescrever.
+ *
+ * Para adicionar/remover alguém da equipe, EDITE ESTA LISTA.
+ *
+ * Aliases ajudam quando o nome no GLPI vem abreviado (ex.: "Igor Minuncio"
+ * em vez de "Igor Martins Minuncio"). A normalização já é case-insensitive
+ * e ignora acentos — só precisa de alias quando o GLPI omite parte do nome.
+ */
+const DEFAULT_RPA_COLLABORATORS: RpaCollaborator[] = [
+  {
+    canonical: 'Igor Martins Minuncio',
+    aliases: ['Igor Minuncio', 'Igor Martins'],
+  },
+  {
+    canonical: 'Levi Ribeiro Cury',
+    aliases: ['Levi Cury', 'Levi Ribeiro'],
+  },
+  {
+    canonical: 'Guilherme Bretanha Franco Fernandes',
+    aliases: [
+      'Guilherme Bretanha',
+      'Guilherme Fernandes',
+      'Guilherme Franco Fernandes',
+    ],
+  },
+  {
+    canonical: 'Daniel Eduardo Fernandes dos Santos',
+    aliases: [
+      'Daniel Fernandes',
+      'Daniel Santos',
+      'Daniel dos Santos',
+      'Daniel Eduardo',
+    ],
+  },
+  {
+    canonical: 'Rodinei Ferraz',
+    aliases: [],
+  },
+  {
+    canonical: 'Carlos Henrique de Oliveira',
+    aliases: ['Carlos Oliveira', 'Carlos Henrique'],
+  },
+];
+
 function parseCollaborators(raw: string | undefined): RpaCollaborator[] {
-  if (!raw) return [];
+  if (!raw || !raw.trim()) {
+    // Sem env var: usa a lista default da equipe RPA.
+    return DEFAULT_RPA_COLLABORATORS;
+  }
   return raw
     .split('|')
     .map(entry => entry.trim())
@@ -84,6 +141,10 @@ export const config = {
   collaborators: parseCollaborators(
     env.VITE_RPA_COLLABORATORS as string | undefined
   ),
+  /** True quando a env var foi definida (sobrescreve o default). */
+  collaboratorsFromEnv: Boolean(
+    (env.VITE_RPA_COLLABORATORS as string | undefined)?.trim()
+  ),
   ui: {
     autoRefreshMinutes: 20,
     /**
@@ -123,21 +184,20 @@ export function logConfigBanner(): void {
     `  glpi.authBasic: ${config.glpi.authBasic ? 'OK' : 'AUSENTE !!'}`,
     `  glpi.plannedCategoryId: ${config.glpi.plannedTaskCategoryId}`,
     `  glpi.realizedCategoryId: ${config.glpi.realizedTaskCategoryId}`,
-    `  collaborators (whitelist): ${
-      collabs.length === 0
-        ? 'VAZIA -> aceitando TODOS os colaboradores nas tasks'
-        : `${collabs.length} -> [${collabs.join(' | ')}]`
-    }`,
+    `  collaborators (whitelist): ${collabs.length} ${
+      config.collaboratorsFromEnv ? '[via env VITE_RPA_COLLABORATORS]' : '[default RPA hardcoded]'
+    } -> [${collabs.join(' | ')}]`,
     `  ui.maxTicketsForHours: ${config.ui.maxTicketsForHours}`,
     `  ui.staleThresholdDays: ${config.ui.staleThresholdDays}`,
   ];
   console.log(lines.join('\n'));
   if (collabs.length === 0) {
+    // Improvavel ate aqui (default hardcoded), mas defensivo: alguem pode
+    // ter passado VITE_RPA_COLLABORATORS="" (vazia mas presente).
     console.warn(
-      '[config] VITE_RPA_COLLABORATORS nao esta definida. ' +
+      '[config] Lista de colaboradores RPA esta VAZIA. ' +
         'O painel vai mostrar TODAS as horas de TODAS as pessoas que apontaram nos chamados. ' +
-        'Para restringir aa equipe RPA, adicione no Vercel: ' +
-        'VITE_RPA_COLLABORATORS="Levi Ribeiro Cury|Igor Martins Minuncio|Guilherme Bretanha|Daniel"'
+        'Verifique a env var VITE_RPA_COLLABORATORS ou o default em src/config.ts.'
     );
   }
 }
