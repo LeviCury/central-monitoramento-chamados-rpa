@@ -43,14 +43,6 @@ Nada inventado. Nada exagerado. **Apenas o que importa, lindamente apresentado.*
 
 ---
 
-## Filosofia
-
-> Um dashboard de operação não precisa ser bonito.
-> Mas se ele **for** — a equipe abre. Se a equipe abre, a equipe age.
-> Se a equipe age, a operação melhora.
->
-> Beleza, aqui, é função.
-
 Este projeto é construído sobre quatro princípios:
 
 | Princípio                         | Como se traduz no código                                                                |
