@@ -6,17 +6,21 @@ import {
   ArrowUp,
   ArrowUpDown,
   Calendar,
+  Check,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
   Eye,
   FileText,
+  ListFilter,
   Maximize2,
   Minimize2,
   Search,
   Tag,
+  X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTheme } from '../contexts/useTheme';
 import { formatHoursMinutes } from '../utils/timeFormat';
 import { getStaleInfo } from '../services/analytics';
@@ -162,6 +166,54 @@ function getSortValue(ticket: Ticket, key: SortKey): string | number {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Filtro de coluna estilo Excel (escopo local da tabela — não afeta o resto do app)
+// ---------------------------------------------------------------------------
+
+type FilterableKey = 'type' | 'status' | 'technician';
+
+const FILTERABLE_KEYS: ReadonlySet<FilterableKey> = new Set([
+  'type',
+  'status',
+  'technician',
+]);
+
+interface ColumnFilters {
+  type: Set<string>;
+  status: Set<string>;
+  technician: Set<string>;
+}
+
+function emptyColumnFilters(): ColumnFilters {
+  return { type: new Set(), status: new Set(), technician: new Set() };
+}
+
+/**
+ * Valor canônico da célula usado pelo filtro. Padroniza:
+ *   - tipo: usa o label legível em pt-BR (Incidente / Requisição / Sem tipo)
+ *   - status: usa o status bruto do GLPI (já vem em pt-BR)
+ *   - técnico: usa o nome formatado (com fallback "Não atribuído")
+ */
+function getFilterValue(ticket: Ticket, key: FilterableKey): string {
+  if (key === 'type') return TYPE_LABEL[ticket.type];
+  if (key === 'status') return ticket.status || 'Sem status';
+  // technician
+  const raw = ticket.assigned_technician;
+  if (!raw || raw === 'null' || raw === 'undefined') return 'Não atribuído';
+  if (raw.includes(',')) {
+    const parts = raw.split(',').map(p => p.trim());
+    return `${parts[1]} ${parts[0]}`;
+  }
+  return raw;
+}
+
+/** Valores únicos disponíveis para filtrar uma coluna, ordenados pt-BR. */
+function getDistinctFilterValues(tickets: Ticket[], key: FilterableKey): string[] {
+  const set = new Set<string>();
+  for (const t of tickets) set.add(getFilterValue(t, key));
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+}
+
 export default function TicketTable({ tickets, onSelectTicket }: TicketTableProps) {
   const { isDark } = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
@@ -169,6 +221,15 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
   const [sort, setSort] = useState<SortState>({ key: 'opened', dir: 'desc' });
   const [density, setDensity] = useState<Density>('comfortable');
   const itemsPerPage = 15;
+
+  // Filtros de coluna estilo Excel (escopo local — não vaza pro Dashboard).
+  // Set vazio = sem filtro (mostra todos). Set com valores = mostra só esses.
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>(emptyColumnFilters);
+  const [openFilterKey, setOpenFilterKey] = useState<FilterableKey | null>(null);
+  // Coords (viewport) do botão de filtro clicado, pra ancorar o popover via portal
+  const [popoverAnchor, setPopoverAnchor] = useState<{ x: number; y: number; w: number } | null>(
+    null
+  );
 
   const getStatusBadgeStyle = (status: string) => {
     const styles = isDark ? STATUS_STYLES_DARK : STATUS_STYLES_LIGHT;
@@ -182,7 +243,7 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
   const getTypeBadgeStyle = (type: TicketType) =>
     (isDark ? TYPE_STYLES_DARK : TYPE_STYLES_LIGHT)[type];
 
-  const filtered = useMemo(() => {
+  const searchFiltered = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return tickets.filter(
       t =>
@@ -192,8 +253,22 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
     );
   }, [tickets, searchTerm]);
 
+  // Aplica os filtros de coluna (Set vazio = nenhuma restrição)
+  const columnFiltered = useMemo(() => {
+    const tipoActive = columnFilters.type.size > 0;
+    const statusActive = columnFilters.status.size > 0;
+    const techActive = columnFilters.technician.size > 0;
+    if (!tipoActive && !statusActive && !techActive) return searchFiltered;
+    return searchFiltered.filter(t => {
+      if (tipoActive && !columnFilters.type.has(getFilterValue(t, 'type'))) return false;
+      if (statusActive && !columnFilters.status.has(getFilterValue(t, 'status'))) return false;
+      if (techActive && !columnFilters.technician.has(getFilterValue(t, 'technician'))) return false;
+      return true;
+    });
+  }, [searchFiltered, columnFilters]);
+
   const sorted = useMemo(() => {
-    const arr = [...filtered];
+    const arr = [...columnFiltered];
     arr.sort((a, b) => {
       const av = getSortValue(a, sort.key);
       const bv = getSortValue(b, sort.key);
@@ -202,7 +277,65 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
       return 0;
     });
     return arr;
-  }, [filtered, sort]);
+  }, [columnFiltered, sort]);
+
+  // Resetar pra primeira página quando o conjunto filtrado muda de tamanho
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [columnFilters]);
+
+  // Opções disponíveis no menu vêm do conjunto JÁ filtrado pelo search,
+  // mas IGNORANDO o próprio column filter (estilo Excel: vê-se todas as
+  // opções da fonte mesmo enquanto outras estão deselecionadas).
+  const availableFilterValues = useMemo<Record<FilterableKey, string[]>>(
+    () => ({
+      type: getDistinctFilterValues(searchFiltered, 'type'),
+      status: getDistinctFilterValues(searchFiltered, 'status'),
+      technician: getDistinctFilterValues(searchFiltered, 'technician'),
+    }),
+    [searchFiltered]
+  );
+
+  const totalActiveFilters =
+    columnFilters.type.size + columnFilters.status.size + columnFilters.technician.size;
+
+  const handleToggleFilterValue = (key: FilterableKey, value: string) => {
+    setColumnFilters(prev => {
+      const next = { ...prev, [key]: new Set(prev[key]) };
+      if (next[key].has(value)) next[key].delete(value);
+      else next[key].add(value);
+      return next;
+    });
+  };
+
+  const handleClearFilter = (key: FilterableKey) => {
+    setColumnFilters(prev => ({ ...prev, [key]: new Set<string>() }));
+  };
+
+  const handleSelectAllFilter = (key: FilterableKey) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: new Set(availableFilterValues[key]),
+    }));
+  };
+
+  const handleClearAllFilters = () => setColumnFilters(emptyColumnFilters);
+
+  const handleOpenFilter = (key: FilterableKey, evt: React.MouseEvent<HTMLButtonElement>) => {
+    if (openFilterKey === key) {
+      setOpenFilterKey(null);
+      setPopoverAnchor(null);
+      return;
+    }
+    const rect = evt.currentTarget.getBoundingClientRect();
+    setPopoverAnchor({ x: rect.left, y: rect.bottom, w: rect.width });
+    setOpenFilterKey(key);
+  };
+
+  const handleCloseFilter = () => {
+    setOpenFilterKey(null);
+    setPopoverAnchor(null);
+  };
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / itemsPerPage));
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -290,6 +423,18 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                     </button>
                   </>
                 )}
+                {totalActiveFilters > 0 && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={handleClearAllFilters}
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline underline-offset-2"
+                    >
+                      limpar filtros ({totalActiveFilters})
+                    </button>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -364,30 +509,68 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
                     ? ArrowUp
                     : ArrowDown
                   : ArrowUpDown;
+                const filterableKey: FilterableKey | null =
+                  FILTERABLE_KEYS.has(col.key as FilterableKey)
+                    ? (col.key as FilterableKey)
+                    : null;
+                const filterActive = filterableKey
+                  ? columnFilters[filterableKey].size > 0
+                  : false;
+                const filterCount = filterableKey ? columnFilters[filterableKey].size : 0;
+                const isFilterOpen = openFilterKey === filterableKey;
                 return (
                   <th
                     key={col.key}
                     scope="col"
                     className={`text-${col.align ?? 'left'} ${cellPad} text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider-2`}
                   >
-                    <button
-                      type="button"
-                      onClick={() => handleSort(col.key)}
-                      aria-sort={
-                        active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'
-                      }
-                      className={`inline-flex items-center gap-1.5 transition-colors ${
-                        active
-                          ? 'text-[var(--text-primary)]'
-                          : 'hover:text-[var(--text-primary)]'
-                      }`}
-                    >
-                      {col.label}
-                      <SortIcon
-                        className={`w-3 h-3 ${active ? '' : 'opacity-40'}`}
-                        aria-hidden
-                      />
-                    </button>
+                    <div className="inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSort(col.key)}
+                        aria-sort={
+                          active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'
+                        }
+                        className={`inline-flex items-center gap-1.5 transition-colors ${
+                          active
+                            ? 'text-[var(--text-primary)]'
+                            : 'hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        {col.label}
+                        <SortIcon
+                          className={`w-3 h-3 ${active ? '' : 'opacity-40'}`}
+                          aria-hidden
+                        />
+                      </button>
+                      {filterableKey && (
+                        <button
+                          type="button"
+                          onClick={evt => handleOpenFilter(filterableKey, evt)}
+                          aria-label={`Filtrar por ${col.label}`}
+                          aria-haspopup="dialog"
+                          aria-expanded={isFilterOpen}
+                          title={
+                            filterActive
+                              ? `Filtro ativo (${filterCount} selecionado${filterCount === 1 ? '' : 's'})`
+                              : `Filtrar por ${col.label}`
+                          }
+                          className={`relative inline-flex items-center justify-center w-5 h-5 rounded-md transition-all ${
+                            filterActive || isFilterOpen
+                              ? 'bg-[var(--minerva-red)]/12 text-[var(--minerva-red)]'
+                              : 'text-[var(--text-tertiary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <ListFilter className="w-3 h-3" aria-hidden />
+                          {filterActive && (
+                            <span
+                              className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[var(--minerva-red)] ring-2 ring-[var(--bg-elevated)]"
+                              aria-hidden
+                            />
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </th>
                 );
               })}
@@ -660,6 +843,53 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
           </div>
         </div>
 
+        {openFilterKey && popoverAnchor && (
+          <ColumnFilterPopover
+            title={
+              openFilterKey === 'type'
+                ? 'Filtrar por Tipo'
+                : openFilterKey === 'status'
+                  ? 'Filtrar por Status'
+                  : 'Filtrar por Técnico'
+            }
+            anchor={popoverAnchor}
+            values={availableFilterValues[openFilterKey]}
+            selected={columnFilters[openFilterKey]}
+            isDark={isDark}
+            onToggle={value => handleToggleFilterValue(openFilterKey, value)}
+            onSelectAll={() => handleSelectAllFilter(openFilterKey)}
+            onClear={() => handleClearFilter(openFilterKey)}
+            onClose={handleCloseFilter}
+            renderValue={value => {
+              if (openFilterKey === 'type') {
+                const dotKey: TicketType =
+                  value === 'Incidente' ? 'incident' : value === 'Requisição' ? 'request' : 'unknown';
+                return (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${TYPE_DOTS[dotKey]}`}
+                      aria-hidden
+                    />
+                    {value}
+                  </span>
+                );
+              }
+              if (openFilterKey === 'status') {
+                return (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${STATUS_DOTS[value] ?? 'bg-slate-400'}`}
+                      aria-hidden
+                    />
+                    {value}
+                  </span>
+                );
+              }
+              return <span>{value}</span>;
+            }}
+          />
+        )}
+
         {totalPages > 1 && (
           <div className="inline-flex items-center gap-0.5 p-0.5 rounded-xl bg-[var(--bg-subtle)] border border-[var(--border-subtle)]">
             <button
@@ -707,5 +937,209 @@ export default function TicketTable({ tickets, onSelectTicket }: TicketTableProp
         )}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Popover do filtro estilo Excel (renderizado em portal)
+// ---------------------------------------------------------------------------
+
+interface ColumnFilterPopoverProps {
+  title: string;
+  anchor: { x: number; y: number; w: number };
+  values: string[];
+  selected: Set<string>;
+  isDark: boolean;
+  onToggle: (value: string) => void;
+  onSelectAll: () => void;
+  onClear: () => void;
+  onClose: () => void;
+  renderValue?: (value: string) => React.ReactNode;
+}
+
+const POPOVER_WIDTH = 280;
+const POPOVER_MAX_HEIGHT = 360;
+
+function ColumnFilterPopover({
+  title,
+  anchor,
+  values,
+  selected,
+  onToggle,
+  onSelectAll,
+  onClear,
+  onClose,
+  renderValue,
+}: ColumnFilterPopoverProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [search, setSearch] = useState('');
+  const [pos, setPos] = useState<{ left: number; top: number }>({
+    left: anchor.x,
+    top: anchor.y + 6,
+  });
+
+  // Reposiciona pra caber dentro do viewport
+  useLayoutEffect(() => {
+    const margin = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = anchor.x;
+    let top = anchor.y + 6;
+    if (left + POPOVER_WIDTH + margin > vw) left = Math.max(margin, vw - POPOVER_WIDTH - margin);
+    if (left < margin) left = margin;
+    if (top + POPOVER_MAX_HEIGHT + margin > vh) {
+      // Tenta abrir pra cima do botão se não couber pra baixo
+      const upTop = anchor.y - 6 - POPOVER_MAX_HEIGHT - anchor.w * 0; // anchor.w não importa aqui
+      top = Math.max(margin, upTop);
+    }
+    setPos({ left, top });
+  }, [anchor]);
+
+  // Click outside + ESC fecham o popover
+  useEffect(() => {
+    const handlePointer = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) onClose();
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    // Pequeno delay pra evitar fechar com o mesmo click que abriu
+    const id = window.setTimeout(() => {
+      document.addEventListener('mousedown', handlePointer);
+    }, 0);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      window.clearTimeout(id);
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [onClose]);
+
+  const filteredValues = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return values;
+    return values.filter(v => v.toLowerCase().includes(term));
+  }, [values, search]);
+
+  const allSelected = values.length > 0 && values.every(v => selected.has(v));
+  const noneSelected = selected.size === 0;
+
+  return createPortal(
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-label={title}
+      style={{
+        position: 'fixed',
+        left: pos.left,
+        top: pos.top,
+        width: POPOVER_WIDTH,
+        maxHeight: POPOVER_MAX_HEIGHT,
+        zIndex: 60,
+      }}
+      className="surface-elevated rounded-2xl border border-[var(--border-default)] shadow-lifted flex flex-col overflow-hidden ticket-filter-popover"
+    >
+      <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b border-[var(--border-subtle)]">
+        <span className="text-[11px] font-semibold uppercase tracking-wider-2 text-[var(--text-tertiary)]">
+          {title}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fechar filtro"
+          className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
+        >
+          <X className="w-3.5 h-3.5" aria-hidden />
+        </button>
+      </div>
+
+      <div className="px-3 pt-2.5 pb-2 border-b border-[var(--border-subtle)]">
+        <div className="relative">
+          <Search
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-tertiary)]"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar valor…"
+            aria-label="Buscar valor para filtrar"
+            autoFocus
+            className="w-full pl-8 pr-2.5 py-1.5 bg-[var(--bg-subtle)] border border-[var(--border-subtle)] rounded-lg text-[12.5px] text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ring-color)] focus:border-transparent transition-all"
+          />
+        </div>
+        <div className="flex items-center justify-between mt-2 text-[11px]">
+          <button
+            type="button"
+            onClick={onSelectAll}
+            disabled={allSelected}
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Selecionar todos
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={noneSelected}
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Limpar
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-y-auto py-1.5 flex-1">
+        {filteredValues.length === 0 ? (
+          <div className="px-3.5 py-6 text-center">
+            <p className="text-xs text-[var(--text-tertiary)]">Nenhum valor encontrado</p>
+          </div>
+        ) : (
+          <ul role="listbox" aria-multiselectable="true" className="px-1">
+            {filteredValues.map(value => {
+              const isChecked = selected.has(value);
+              return (
+                <li key={value}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isChecked}
+                    onClick={() => onToggle(value)}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left text-[13px] text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-colors"
+                  >
+                    <span
+                      className={`flex items-center justify-center w-4 h-4 rounded border transition-all shrink-0 ${
+                        isChecked
+                          ? 'bg-[var(--text-primary)] border-[var(--text-primary)] text-[var(--bg-elevated)]'
+                          : 'bg-transparent border-[var(--border-strong)]'
+                      }`}
+                      aria-hidden
+                    >
+                      {isChecked && <Check className="w-3 h-3" strokeWidth={3} />}
+                    </span>
+                    <span className="flex-1 truncate">
+                      {renderValue ? renderValue(value) : value}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="px-3.5 py-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-tertiary)] tnum">
+        {selected.size === 0 ? (
+          <>Sem filtro ativo · {values.length} valor{values.length === 1 ? '' : 'es'}</>
+        ) : (
+          <>
+            <span className="font-semibold text-[var(--text-secondary)]">{selected.size}</span>{' '}
+            de {values.length} selecionado{selected.size === 1 ? '' : 's'}
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }

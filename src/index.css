@@ -423,6 +423,23 @@ a:focus-visible {
   animation: pulse-soft 2.4s ease-in-out infinite;
 }
 
+/* Popover de filtro de coluna (TicketTable) — entrada suave estilo Linear */
+.ticket-filter-popover {
+  transform-origin: top left;
+  animation: ticket-filter-pop 140ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes ticket-filter-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 /* Apresentação — wrapper de modo TV */
 .presentation-mode {
   overflow: hidden;
